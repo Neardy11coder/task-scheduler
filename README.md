@@ -167,7 +167,7 @@ Full interactive docs at `http://localhost:8000/docs`
 
 ## 👨‍💻 Author
 
-**Hardik** — B.Tech CS (First Year) | AI & DSA Enthusiast
+**Hardik** — B.Tech CS (Second Year) | AI & DSA Enthusiast
 
 > *"I built a task scheduler using a Min-Heap based Priority Queue in Python. The heap ensures O(log n) insertion and always serves the highest priority task first. I used a Stack for undo, Supabase for cloud persistence, FastAPI for REST API, and D3.js for live heap visualization."*
 
