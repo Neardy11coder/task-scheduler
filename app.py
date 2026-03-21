@@ -2,7 +2,8 @@ import streamlit as st
 import plotly.graph_objects as go
 from scheduler import TaskScheduler
 from visualizer import generate_heap_html
-from db_operations import get_completed_tasks, get_task_stats, get_analytics_data
+from supabase_db import get_completed_tasks, get_task_stats, get_analytics_data
+from auth_manager import sign_in, sign_up
 import streamlit.components.v1 as components
 
 # ── Page config ───────────────────────────────────────────
@@ -27,24 +28,12 @@ st.markdown("""
     .priority-3 { border-left-color: #f9e2af; }
     .priority-4 { border-left-color: #89b4fa; }
     .priority-5 { border-left-color: #a6e3a1; }
-    .task-title {
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #cdd6f4;
-        margin: 0;
-    }
-    .task-meta {
-        font-size: 0.8rem;
-        color: #6c7086;
-        margin-top: 4px;
-    }
+    .task-title { font-size: 1.1rem; font-weight: 700; color: #cdd6f4; margin: 0; }
+    .task-meta { font-size: 0.8rem; color: #6c7086; margin-top: 4px; }
     .badge {
-        display: inline-block;
-        padding: 2px 10px;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        margin-right: 8px;
+        display: inline-block; padding: 2px 10px;
+        border-radius: 20px; font-size: 0.75rem;
+        font-weight: 600; margin-right: 8px;
     }
     .badge-1 { background: #f38ba822; color: #f38ba8; }
     .badge-2 { background: #fab38722; color: #fab387; }
@@ -52,51 +41,24 @@ st.markdown("""
     .badge-4 { background: #89b4fa22; color: #89b4fa; }
     .badge-5 { background: #a6e3a122; color: #a6e3a1; }
     .stat-box {
-        background: #1e1e2e;
-        border-radius: 10px;
-        padding: 16px;
-        text-align: center;
-        margin-bottom: 12px;
+        background: #1e1e2e; border-radius: 10px;
+        padding: 16px; text-align: center; margin-bottom: 12px;
     }
-    .stat-number {
-        font-size: 2rem;
-        font-weight: 800;
-        color: #cba6f7;
-    }
-    .stat-label {
-        font-size: 0.8rem;
-        color: #6c7086;
-    }
-    div[data-testid="stSidebar"] {
-        background: #181825;
-    }
+    .stat-number { font-size: 2rem; font-weight: 800; color: #cba6f7; }
+    .stat-label { font-size: 0.8rem; color: #6c7086; }
+    div[data-testid="stSidebar"] { background: #181825; }
     .completed-row {
-        padding: 8px 12px;
-        border-radius: 8px;
-        margin-bottom: 6px;
-        background: #1e1e2e;
-        border-left: 3px solid #a6e3a1;
-        color: #6c7086;
-        font-size: 0.85rem;
+        padding: 8px 12px; border-radius: 8px; margin-bottom: 6px;
+        background: #1e1e2e; border-left: 3px solid #a6e3a1;
+        color: #6c7086; font-size: 0.85rem;
     }
-    .history-row {
-        padding: 6px 10px;
-        border-radius: 6px;
-        margin-bottom: 4px;
-        background: #181825;
-        font-size: 0.78rem;
-        color: #6c7086;
+    .auth-box {
+        max-width: 420px; margin: 60px auto;
+        background: #1e1e2e; border-radius: 16px;
+        padding: 40px; border: 1px solid #313244;
     }
 </style>
 """, unsafe_allow_html=True)
-
-# ── Session state ─────────────────────────────────────────
-if "scheduler" not in st.session_state:
-    st.session_state.scheduler = TaskScheduler()
-if "completed_count" not in st.session_state:
-    st.session_state.completed_count = 0
-
-scheduler = st.session_state.scheduler
 
 # ── Config helpers ────────────────────────────────────────
 CATEGORY_CONFIG = {
@@ -115,13 +77,89 @@ PRIORITY_LABELS = {
     5: ("⚪", "Minimal")
 }
 
+# ── Session state ─────────────────────────────────────────
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = None
+if "user_id" not in st.session_state:
+    st.session_state.user_id = None
+if "completed_count" not in st.session_state:
+    st.session_state.completed_count = 0
+
+# ── Auth screen ───────────────────────────────────────────
+if not st.session_state.logged_in:
+    st.markdown("""
+    <div style='text-align:center; padding-top: 40px;'>
+        <h1>📋 Task Scheduler</h1>
+        <p style='color:#6c7086'>Powered by Min-Heap DSA</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
+
+    with tab_login:
+        st.write("")
+        login_user = st.text_input("Username", key="login_user")
+        login_pass = st.text_input("Password", type="password", key="login_pass")
+        st.write("")
+        if st.button("Login", use_container_width=True, type="primary"):
+            if login_user and login_pass:
+                result = sign_in(login_user, login_pass)
+                if result["success"]:
+                    st.session_state.logged_in  = True
+                    st.session_state.username   = result["user"]["username"]
+                    st.session_state.user_id    = str(result["user"]["id"])
+                    st.session_state.scheduler  = TaskScheduler(
+                        user_id=st.session_state.user_id
+                    )
+                    st.success(f"Welcome back, {login_user}!")
+                    st.rerun()
+                else:
+                    st.error(result["error"])
+            else:
+                st.warning("Please fill in all fields")
+
+    with tab_signup:
+        st.write("")
+        new_user  = st.text_input("Username", key="signup_user")
+        new_email = st.text_input("Email", key="signup_email")
+        new_pass  = st.text_input("Password", type="password", key="signup_pass")
+        new_pass2 = st.text_input("Confirm Password", type="password", key="signup_pass2")
+        st.write("")
+        if st.button("Create Account", use_container_width=True, type="primary"):
+            if new_user and new_email and new_pass and new_pass2:
+                if new_pass != new_pass2:
+                    st.error("Passwords don't match!")
+                elif len(new_pass) < 6:
+                    st.error("Password must be at least 6 characters")
+                else:
+                    result = sign_up(new_user, new_email, new_pass)
+                    if result["success"]:
+                        st.success("Account created! Please login.")
+                    else:
+                        st.error(result["error"])
+            else:
+                st.warning("Please fill in all fields")
+
+    st.stop()
+
+# ── App (only shown when logged in) ──────────────────────
+if "scheduler" not in st.session_state:
+    st.session_state.scheduler = TaskScheduler(
+        user_id=st.session_state.user_id
+    )
+
+scheduler = st.session_state.scheduler
+user_id   = st.session_state.user_id
+
 # ── Sidebar ───────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 📋 Task Scheduler")
-    st.caption("Powered by Min-Heap DSA")
+    st.markdown(f"## 📋 Task Scheduler")
+    st.caption(f"Logged in as **{st.session_state.username}**")
     st.divider()
 
-    stats = get_task_stats()
+    stats = get_task_stats(user_id)
     st.markdown(f"""
     <div class="stat-box">
         <div class="stat-number">{stats['pending']}</div>
@@ -166,6 +204,13 @@ with st.sidebar:
             icon = "➕" if action.action_type == "ADD" else "✅"
             st.caption(f"{icon} {action.action_type}: {action.task_name[:15]}")
 
+    st.divider()
+
+    if st.button("🚪 Logout", use_container_width=True):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
 # ── Main area ─────────────────────────────────────────────
 st.title("📋 Priority-Based Task Scheduler")
 st.caption("Tasks are automatically sorted by urgency using a Min-Heap")
@@ -178,21 +223,16 @@ col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
 
 with col1:
     task_name = st.text_input("Task Name", placeholder="e.g. Fix login bug")
-
 with col2:
     priority = st.selectbox(
-        "Priority",
-        options=[1, 2, 3, 4, 5],
+        "Priority", options=[1, 2, 3, 4, 5],
         format_func=lambda x: f"{PRIORITY_LABELS[x][0]} {PRIORITY_LABELS[x][1]}"
     )
-
 with col3:
     category = st.selectbox(
-        "Category",
-        options=list(CATEGORY_CONFIG.keys()),
+        "Category", options=list(CATEGORY_CONFIG.keys()),
         format_func=lambda x: f"{CATEGORY_CONFIG[x]['icon']} {x}"
     )
-
 with col4:
     deadline = st.text_input("Deadline (optional)", placeholder="e.g. 2026-03-30")
     add_btn = st.button("➕ Add Task", use_container_width=True, type="primary")
@@ -230,12 +270,11 @@ else:
     for i, task in enumerate(tasks):
         emoji, label = PRIORITY_LABELS[task.priority]
         deadline_str = f"&nbsp;&nbsp;📅 <b>{task.deadline}</b>" if task.deadline else ""
-
         col_task, col_btn = st.columns([6, 1])
 
         with col_task:
             cat = task.category if task.category in CATEGORY_CONFIG else "Other"
-            cat_icon = CATEGORY_CONFIG[cat]["icon"]
+            cat_icon  = CATEGORY_CONFIG[cat]["icon"]
             cat_color = CATEGORY_CONFIG[cat]["color"]
             st.markdown(f"""
             <div class="task-card priority-{task.priority}">
@@ -267,18 +306,16 @@ if scheduler.is_empty():
     st.info("Add tasks to see the heap tree!")
 else:
     col_viz, col_info = st.columns([3, 1])
-
     with col_viz:
         heap_html = generate_heap_html(scheduler._heap)
         components.html(heap_html, height=500, scrolling=False)
-
     with col_info:
         st.markdown("#### How to read this")
         st.markdown("""
-        - **Root node** = highest priority task (always served first)
-        - **Node index** = position in the heap array
+        - **Root node** = highest priority task
+        - **Node index** = position in heap array
         - **Color** = priority level
-        - **Left/Right children** always have lower priority than parent
+        - **Children** always lower priority than parent
         """)
         st.divider()
         st.markdown("#### Heap Array")
@@ -320,14 +357,14 @@ st.divider()
 
 # ── Completed Task History ────────────────────────────────
 st.subheader("✅ Completed Tasks")
-completed_tasks = get_completed_tasks()
+completed_tasks = get_completed_tasks(user_id)
 
 if not completed_tasks:
-    st.caption("No completed tasks yet — complete some tasks above!")
+    st.caption("No completed tasks yet!")
 else:
     st.caption(f"{len(completed_tasks)} task(s) completed total")
     st.write("")
-    for row in completed_tasks[:10]:
+    for row in completed_tasks:
         emoji = ["🔴", "🟠", "🟡", "🔵", "⚪"][row["priority"] - 1]
         deadline_str = f" | 📅 {row['deadline']}" if row["deadline"] else ""
         cat = row["category"] if row["category"] else "General"
@@ -346,47 +383,34 @@ st.divider()
 st.subheader("📈 Analytics Dashboard")
 st.caption("Productivity insights powered by your task history")
 
-data = get_analytics_data()
+data = get_analytics_data(user_id)
 
 if data["total"] == 0:
     st.info("Add and complete some tasks to see analytics!")
 else:
     k1, k2, k3, k4 = st.columns(4)
-
     with k1:
-        st.markdown(f"""
-        <div class="stat-box">
+        st.markdown(f"""<div class="stat-box">
             <div class="stat-number">{data['total']}</div>
-            <div class="stat-label">Total Tasks</div>
-        </div>
-        """, unsafe_allow_html=True)
-
+            <div class="stat-label">Total Tasks</div></div>""",
+            unsafe_allow_html=True)
     with k2:
-        st.markdown(f"""
-        <div class="stat-box">
+        st.markdown(f"""<div class="stat-box">
             <div class="stat-number">{data['completed']}</div>
-            <div class="stat-label">Completed</div>
-        </div>
-        """, unsafe_allow_html=True)
-
+            <div class="stat-label">Completed</div></div>""",
+            unsafe_allow_html=True)
     with k3:
-        st.markdown(f"""
-        <div class="stat-box">
+        st.markdown(f"""<div class="stat-box">
             <div class="stat-number">{data['pending']}</div>
-            <div class="stat-label">Pending</div>
-        </div>
-        """, unsafe_allow_html=True)
-
+            <div class="stat-label">Pending</div></div>""",
+            unsafe_allow_html=True)
     with k4:
-        st.markdown(f"""
-        <div class="stat-box">
+        st.markdown(f"""<div class="stat-box">
             <div class="stat-number">{data['completion_rate']}%</div>
-            <div class="stat-label">Completion Rate</div>
-        </div>
-        """, unsafe_allow_html=True)
+            <div class="stat-label">Completion Rate</div></div>""",
+            unsafe_allow_html=True)
 
     st.write("")
-
     chart1, chart2 = st.columns(2)
 
     with chart1:
@@ -395,21 +419,16 @@ else:
             counts = list(data["category_counts"].values())
             colors = ["#89b4fa", "#a6e3a1", "#f9e2af", "#f38ba8", "#cba6f7"]
             fig_pie = go.Figure(data=[go.Pie(
-                labels=cats,
-                values=counts,
-                hole=0.5,
+                labels=cats, values=counts, hole=0.5,
                 marker=dict(colors=colors[:len(cats)]),
                 textinfo="label+percent",
                 textfont=dict(color="#cdd6f4", size=12),
             )])
             fig_pie.update_layout(
                 title=dict(text="Tasks by Category", font=dict(color="#cdd6f4", size=14)),
-                paper_bgcolor="#1e1e2e",
-                plot_bgcolor="#1e1e2e",
-                font=dict(color="#cdd6f4"),
-                showlegend=False,
-                margin=dict(t=40, b=20, l=20, r=20),
-                height=300,
+                paper_bgcolor="#1e1e2e", plot_bgcolor="#1e1e2e",
+                font=dict(color="#cdd6f4"), showlegend=False,
+                margin=dict(t=40, b=20, l=20, r=20), height=300,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
 
@@ -418,22 +437,18 @@ else:
         priority_colors = ["#f38ba8", "#fab387", "#f9e2af", "#89b4fa", "#a6e3a1"]
         priority_values = [data["priority_counts"].get(i, 0) for i in range(1, 6)]
         fig_bar = go.Figure(data=[go.Bar(
-            x=priority_labels,
-            y=priority_values,
+            x=priority_labels, y=priority_values,
             marker_color=priority_colors,
-            text=priority_values,
-            textposition="outside",
+            text=priority_values, textposition="outside",
             textfont=dict(color="#cdd6f4"),
         )])
         fig_bar.update_layout(
             title=dict(text="Tasks by Priority", font=dict(color="#cdd6f4", size=14)),
-            paper_bgcolor="#1e1e2e",
-            plot_bgcolor="#1e1e2e",
+            paper_bgcolor="#1e1e2e", plot_bgcolor="#1e1e2e",
             font=dict(color="#cdd6f4"),
             xaxis=dict(tickfont=dict(color="#cdd6f4"), gridcolor="#313244"),
             yaxis=dict(tickfont=dict(color="#cdd6f4"), gridcolor="#313244"),
-            margin=dict(t=40, b=20, l=20, r=20),
-            height=300,
+            margin=dict(t=40, b=20, l=20, r=20), height=300,
         )
         st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -441,29 +456,20 @@ else:
         days   = sorted(data["daily_counts"].keys())
         counts = [data["daily_counts"][d] for d in days]
         fig_line = go.Figure(data=[go.Bar(
-            x=days,
-            y=counts,
-            marker_color="#cba6f7",
-            text=counts,
-            textposition="outside",
+            x=days, y=counts, marker_color="#cba6f7",
+            text=counts, textposition="outside",
             textfont=dict(color="#cdd6f4"),
         )])
         fig_line.update_layout(
             title=dict(text="Tasks Completed Per Day", font=dict(color="#cdd6f4", size=14)),
-            paper_bgcolor="#1e1e2e",
-            plot_bgcolor="#1e1e2e",
+            paper_bgcolor="#1e1e2e", plot_bgcolor="#1e1e2e",
             font=dict(color="#cdd6f4"),
             xaxis=dict(tickfont=dict(color="#cdd6f4"), gridcolor="#313244"),
             yaxis=dict(
-                tickfont=dict(color="#cdd6f4"),
-                gridcolor="#313244",
-                title=dict(
-                    text="Tasks Completed",
-                    font=dict(color="#6c7086")
-                ),
+                tickfont=dict(color="#cdd6f4"), gridcolor="#313244",
+                title=dict(text="Tasks Completed", font=dict(color="#6c7086"))
             ),
-            margin=dict(t=40, b=20, l=20, r=20),
-            height=280,
+            margin=dict(t=40, b=20, l=20, r=20), height=280,
         )
         st.plotly_chart(fig_line, use_container_width=True)
 
@@ -488,30 +494,24 @@ else:
         st.markdown(f"""
         <div style="background:#1e1e2e; border-radius:12px; padding:20px;
                     text-align:center; border: 2px solid {score_color};">
-            <div style="font-size:2.5rem; font-weight:800; color:{score_color}">
-                {rate}%
-            </div>
-            <div style="font-size:1rem; color:{score_color}; margin-top:4px;">
-                {score_label}
-            </div>
-            <div style="font-size:0.75rem; color:#6c7086; margin-top:8px;">
-                Completion Rate
-            </div>
+            <div style="font-size:2.5rem; font-weight:800; color:{score_color}">{rate}%</div>
+            <div style="font-size:1rem; color:{score_color}; margin-top:4px;">{score_label}</div>
+            <div style="font-size:0.75rem; color:#6c7086; margin-top:8px;">Completion Rate</div>
         </div>
         """, unsafe_allow_html=True)
 
     with tip_col:
         st.markdown("#### 💡 Productivity Insights")
         if data["pending"] > 5:
-            st.warning(f"⚠️ You have {data['pending']} pending tasks — consider completing high priority ones first!")
+            st.warning(f"⚠️ You have {data['pending']} pending tasks!")
         if data["priority_counts"].get(1, 0) > 3:
-            st.error(f"🔴 {data['priority_counts'][1]} Critical tasks pending — focus here first!")
+            st.error(f"🔴 {data['priority_counts'][1]} Critical tasks — focus here first!")
         if rate >= 80:
-            st.success("🔥 Outstanding completion rate! You're crushing it!")
+            st.success("🔥 Outstanding completion rate!")
         elif rate >= 50:
-            st.info("👍 Good progress! Keep completing those high priority tasks.")
+            st.info("👍 Good progress! Keep completing high priority tasks.")
         else:
-            st.info("🌱 Just getting started! Try completing your top priority task first.")
+            st.info("🌱 Just getting started! Complete your top priority task first.")
         top = scheduler.peek_top_task()
         if top:
             st.markdown(f"**Next recommended task:** {top.name} (Priority {top.priority})")

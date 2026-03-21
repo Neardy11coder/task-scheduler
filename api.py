@@ -3,9 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from scheduler import TaskScheduler
-from db_operations import get_completed_tasks, get_task_stats
+from supabase_db import get_completed_tasks, get_task_stats
 
-# ── App setup ─────────────────────────────────────────────
 app = FastAPI(
     title="Task Scheduler API",
     description="Priority-Based Task Scheduler powered by Min-Heap DSA",
@@ -19,25 +18,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Shared scheduler instance ─────────────────────────────
-scheduler = TaskScheduler()
+# ── Shared scheduler (default user for API access) ────────
+scheduler = TaskScheduler(user_id="api_user")
 
-# ── Request/Response models ───────────────────────────────
+# ── Models ────────────────────────────────────────────────
 class TaskCreate(BaseModel):
     name: str
     priority: int
     category: Optional[str] = "General"
     deadline: Optional[str] = None
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "name": "Fix login bug",
-                "priority": 1,
-                "category": "Work",
-                "deadline": "2026-03-30"
-            }
-        }
+    user_id: Optional[str] = "api_user"
 
 class TaskResponse(BaseModel):
     name: str
@@ -52,7 +42,6 @@ class StatsResponse(BaseModel):
     completed: int
     next_task: Optional[str]
 
-# ── Helper ────────────────────────────────────────────────
 PRIORITY_LABELS = {
     1: "Critical", 2: "High", 3: "Medium", 4: "Low", 5: "Minimal"
 }
@@ -71,7 +60,6 @@ def task_to_response(task) -> TaskResponse:
 
 @app.get("/", tags=["Health"])
 def root():
-    """Health check endpoint."""
     return {
         "status": "running",
         "app": "Priority-Based Task Scheduler",
@@ -102,7 +90,6 @@ def create_task(task: TaskCreate):
         category=task.category
     )
 
-    # Return the newly added top task matching our input
     all_tasks = scheduler.get_all_tasks()
     for t in all_tasks:
         if t.name == task.name.strip() and t.priority == task.priority:
@@ -122,7 +109,7 @@ def get_next_task():
 
 @app.delete("/tasks/complete", response_model=TaskResponse, tags=["Tasks"])
 def complete_top_task():
-    """Complete (remove) the highest priority task."""
+    """Complete the highest priority task."""
     if scheduler.is_empty():
         raise HTTPException(status_code=404, detail="No tasks to complete")
     removed = scheduler.remove_top_task()
@@ -139,26 +126,26 @@ def undo_last_action():
 
 
 @app.get("/tasks/completed", tags=["Tasks"])
-def get_completed():
-    """Get all completed tasks history."""
-    completed = get_completed_tasks()
+def get_completed(user_id: str = "api_user"):
+    """Get completed tasks history."""
+    completed = get_completed_tasks(user_id)
     return [
         {
-            "name": t["name"],
-            "priority": t["priority"],
+            "name":           t["name"],
+            "priority":       t["priority"],
             "priority_label": PRIORITY_LABELS.get(t["priority"], "Unknown"),
-            "category": t["category"],
-            "deadline": t["deadline"],
+            "category":       t["category"],
+            "deadline":       t["deadline"],
         }
         for t in completed
     ]
 
 
 @app.get("/stats", response_model=StatsResponse, tags=["Stats"])
-def get_stats():
+def get_stats(user_id: str = "api_user"):
     """Get scheduler statistics."""
-    stats = get_task_stats()
-    top = scheduler.peek_top_task()
+    stats = get_task_stats(user_id)
+    top   = scheduler.peek_top_task()
     return StatsResponse(
         pending=stats["pending"],
         completed=stats["completed"],
@@ -168,6 +155,6 @@ def get_stats():
 
 @app.delete("/tasks/clear", tags=["Tasks"])
 def clear_all():
-    """Clear all tasks from the scheduler."""
+    """Clear all tasks."""
     scheduler.clear_all()
     return {"message": "All tasks cleared"}
