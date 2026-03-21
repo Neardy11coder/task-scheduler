@@ -1,7 +1,8 @@
 import streamlit as st
+import plotly.graph_objects as go
 from scheduler import TaskScheduler
 from visualizer import generate_heap_html
-from db_operations import get_completed_tasks, get_task_stats
+from db_operations import get_completed_tasks, get_task_stats, get_analytics_data
 import streamlit.components.v1 as components
 
 # ── Page config ───────────────────────────────────────────
@@ -120,7 +121,6 @@ with st.sidebar:
     st.caption("Powered by Min-Heap DSA")
     st.divider()
 
-    # Stats from DB
     stats = get_task_stats()
     st.markdown(f"""
     <div class="stat-box">
@@ -138,14 +138,12 @@ with st.sidebar:
 
     st.divider()
 
-    # Priority legend
     st.markdown("#### Priority Legend")
     for p, (emoji, label) in PRIORITY_LABELS.items():
         st.markdown(f"{emoji} **{label}** — Level {p}")
 
     st.divider()
 
-    # Next up
     st.markdown("#### ⚡ Next Up")
     top = scheduler.peek_top_task()
     if top:
@@ -159,7 +157,6 @@ with st.sidebar:
 
     st.divider()
 
-    # Undo history
     st.markdown("#### ↩️ Action History")
     history = scheduler.get_undo_history()
     if not history:
@@ -342,3 +339,179 @@ else:
             {cat_icon} {cat}{deadline_str}
         </div>
         """, unsafe_allow_html=True)
+
+st.divider()
+
+# ── Analytics Dashboard ───────────────────────────────────
+st.subheader("📈 Analytics Dashboard")
+st.caption("Productivity insights powered by your task history")
+
+data = get_analytics_data()
+
+if data["total"] == 0:
+    st.info("Add and complete some tasks to see analytics!")
+else:
+    k1, k2, k3, k4 = st.columns(4)
+
+    with k1:
+        st.markdown(f"""
+        <div class="stat-box">
+            <div class="stat-number">{data['total']}</div>
+            <div class="stat-label">Total Tasks</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with k2:
+        st.markdown(f"""
+        <div class="stat-box">
+            <div class="stat-number">{data['completed']}</div>
+            <div class="stat-label">Completed</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with k3:
+        st.markdown(f"""
+        <div class="stat-box">
+            <div class="stat-number">{data['pending']}</div>
+            <div class="stat-label">Pending</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with k4:
+        st.markdown(f"""
+        <div class="stat-box">
+            <div class="stat-number">{data['completion_rate']}%</div>
+            <div class="stat-label">Completion Rate</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.write("")
+
+    chart1, chart2 = st.columns(2)
+
+    with chart1:
+        if data["category_counts"]:
+            cats   = list(data["category_counts"].keys())
+            counts = list(data["category_counts"].values())
+            colors = ["#89b4fa", "#a6e3a1", "#f9e2af", "#f38ba8", "#cba6f7"]
+            fig_pie = go.Figure(data=[go.Pie(
+                labels=cats,
+                values=counts,
+                hole=0.5,
+                marker=dict(colors=colors[:len(cats)]),
+                textinfo="label+percent",
+                textfont=dict(color="#cdd6f4", size=12),
+            )])
+            fig_pie.update_layout(
+                title=dict(text="Tasks by Category", font=dict(color="#cdd6f4", size=14)),
+                paper_bgcolor="#1e1e2e",
+                plot_bgcolor="#1e1e2e",
+                font=dict(color="#cdd6f4"),
+                showlegend=False,
+                margin=dict(t=40, b=20, l=20, r=20),
+                height=300,
+            )
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+    with chart2:
+        priority_labels = ["P1 Critical", "P2 High", "P3 Medium", "P4 Low", "P5 Minimal"]
+        priority_colors = ["#f38ba8", "#fab387", "#f9e2af", "#89b4fa", "#a6e3a1"]
+        priority_values = [data["priority_counts"].get(i, 0) for i in range(1, 6)]
+        fig_bar = go.Figure(data=[go.Bar(
+            x=priority_labels,
+            y=priority_values,
+            marker_color=priority_colors,
+            text=priority_values,
+            textposition="outside",
+            textfont=dict(color="#cdd6f4"),
+        )])
+        fig_bar.update_layout(
+            title=dict(text="Tasks by Priority", font=dict(color="#cdd6f4", size=14)),
+            paper_bgcolor="#1e1e2e",
+            plot_bgcolor="#1e1e2e",
+            font=dict(color="#cdd6f4"),
+            xaxis=dict(tickfont=dict(color="#cdd6f4"), gridcolor="#313244"),
+            yaxis=dict(tickfont=dict(color="#cdd6f4"), gridcolor="#313244"),
+            margin=dict(t=40, b=20, l=20, r=20),
+            height=300,
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    if data["daily_counts"]:
+        days   = sorted(data["daily_counts"].keys())
+        counts = [data["daily_counts"][d] for d in days]
+        fig_line = go.Figure(data=[go.Bar(
+            x=days,
+            y=counts,
+            marker_color="#cba6f7",
+            text=counts,
+            textposition="outside",
+            textfont=dict(color="#cdd6f4"),
+        )])
+        fig_line.update_layout(
+            title=dict(text="Tasks Completed Per Day", font=dict(color="#cdd6f4", size=14)),
+            paper_bgcolor="#1e1e2e",
+            plot_bgcolor="#1e1e2e",
+            font=dict(color="#cdd6f4"),
+            xaxis=dict(tickfont=dict(color="#cdd6f4"), gridcolor="#313244"),
+            yaxis=dict(
+                tickfont=dict(color="#cdd6f4"),
+                gridcolor="#313244",
+                title=dict(
+                    text="Tasks Completed",
+                    font=dict(color="#6c7086")
+                ),
+            ),
+            margin=dict(t=40, b=20, l=20, r=20),
+            height=280,
+        )
+        st.plotly_chart(fig_line, use_container_width=True)
+
+    st.write("")
+    score_col, tip_col = st.columns([1, 2])
+
+    with score_col:
+        rate = data["completion_rate"]
+        if rate >= 80:
+            score_color = "#a6e3a1"
+            score_label = "Excellent 🔥"
+        elif rate >= 50:
+            score_color = "#f9e2af"
+            score_label = "Good 👍"
+        elif rate >= 25:
+            score_color = "#fab387"
+            score_label = "Improving 📈"
+        else:
+            score_color = "#f38ba8"
+            score_label = "Just Starting 🌱"
+
+        st.markdown(f"""
+        <div style="background:#1e1e2e; border-radius:12px; padding:20px;
+                    text-align:center; border: 2px solid {score_color};">
+            <div style="font-size:2.5rem; font-weight:800; color:{score_color}">
+                {rate}%
+            </div>
+            <div style="font-size:1rem; color:{score_color}; margin-top:4px;">
+                {score_label}
+            </div>
+            <div style="font-size:0.75rem; color:#6c7086; margin-top:8px;">
+                Completion Rate
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with tip_col:
+        st.markdown("#### 💡 Productivity Insights")
+        if data["pending"] > 5:
+            st.warning(f"⚠️ You have {data['pending']} pending tasks — consider completing high priority ones first!")
+        if data["priority_counts"].get(1, 0) > 3:
+            st.error(f"🔴 {data['priority_counts'][1]} Critical tasks pending — focus here first!")
+        if rate >= 80:
+            st.success("🔥 Outstanding completion rate! You're crushing it!")
+        elif rate >= 50:
+            st.info("👍 Good progress! Keep completing those high priority tasks.")
+        else:
+            st.info("🌱 Just getting started! Try completing your top priority task first.")
+        top = scheduler.peek_top_task()
+        if top:
+            st.markdown(f"**Next recommended task:** {top.name} (Priority {top.priority})")

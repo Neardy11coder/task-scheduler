@@ -116,3 +116,45 @@ def get_task_stats() -> dict:
         "pending": total_pending,
         "completed": total_completed
     }
+
+
+def get_analytics_data() -> dict:
+    """Fetch all data needed for analytics dashboard."""
+    db = get_db()
+    try:
+        all_tasks = db.query(TaskModel).all()
+
+        completed_tasks = [t for t in all_tasks if t.completed == 1]
+        pending_tasks   = [t for t in all_tasks if t.completed == 0]
+
+        category_counts = {}
+        for t in all_tasks:
+            cat = t.category or "General"
+            category_counts[cat] = category_counts.get(cat, 0) + 1
+
+        priority_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        for t in all_tasks:
+            if t.priority in priority_counts:
+                priority_counts[t.priority] += 1
+
+        daily_counts = {}
+        for t in completed_tasks:
+            if t.created_at:
+                day = t.created_at[:10]
+                daily_counts[day] = daily_counts.get(day, 0) + 1
+
+        total = len(all_tasks)
+        completed_count = len(completed_tasks)
+        rate = round((completed_count / total * 100), 1) if total > 0 else 0
+
+        return {
+            "total":           total,
+            "completed":       completed_count,
+            "pending":         len(pending_tasks),
+            "completion_rate": rate,
+            "category_counts": category_counts,
+            "priority_counts": priority_counts,
+            "daily_counts":    daily_counts,
+        }
+    finally:
+        db.close()
