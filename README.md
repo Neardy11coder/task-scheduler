@@ -3,7 +3,7 @@
 A full-stack task scheduling application built with **Python** and **Streamlit**, powered by a **Min-Heap (Priority Queue)** data structure.
 
 ## 🚀 Live Demo
-> Run locally — instructions below
+👉 **[https://hardik-task-scheduler.streamlit.app](https://hardik-task-scheduler.streamlit.app)**
 
 ## 🧠 DSA Concepts Used
 | Concept | Where Used |
