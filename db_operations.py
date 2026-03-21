@@ -59,9 +59,23 @@ def mark_task_complete(task_name: str, priority: int):
 def get_completed_tasks() -> list:
     """Fetch all completed tasks for history view."""
     db = get_db()
-    rows = db.query(TaskModel).filter(TaskModel.completed == 1).order_by(TaskModel.id.desc()).all()
-    db.close()
-    return rows
+    try:
+        rows = db.query(TaskModel).filter(
+            TaskModel.completed == 1
+        ).order_by(TaskModel.id.desc()).all()
+        result = []
+        for row in rows:
+            result.append({
+                "id": row.id,
+                "name": row.name,
+                "priority": row.priority,
+                "category": row.category,
+                "deadline": row.deadline,
+                "created_at": row.created_at
+            })
+        return result
+    finally:
+        db.close()
 
 
 def delete_all_tasks():
@@ -70,6 +84,26 @@ def delete_all_tasks():
     db.query(TaskModel).delete()
     db.commit()
     db.close()
+
+
+def restore_task_in_db(task_name: str, priority: int) -> int:
+    """Restore a completed task back to pending (undo complete)."""
+    db = get_db()
+    db_task = db.query(TaskModel).filter(
+        TaskModel.name == task_name,
+        TaskModel.priority == priority,
+        TaskModel.completed == 1
+    ).order_by(TaskModel.id.desc()).first()
+
+    if db_task:
+        db_task.completed = 0
+        db.commit()
+        task_id = db_task.id
+        db.close()
+        return task_id
+
+    db.close()
+    return None
 
 
 def get_task_stats() -> dict:

@@ -78,6 +78,14 @@ st.markdown("""
         color: #6c7086;
         font-size: 0.85rem;
     }
+    .history-row {
+        padding: 6px 10px;
+        border-radius: 6px;
+        margin-bottom: 4px;
+        background: #181825;
+        font-size: 0.78rem;
+        color: #6c7086;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -89,7 +97,7 @@ if "completed_count" not in st.session_state:
 
 scheduler = st.session_state.scheduler
 
-# ── Priority helpers ──────────────────────────────────────
+# ── Config helpers ────────────────────────────────────────
 CATEGORY_CONFIG = {
     "Work":     {"icon": "💼", "color": "#89b4fa"},
     "Personal": {"icon": "🏠", "color": "#a6e3a1"},
@@ -112,8 +120,8 @@ with st.sidebar:
     st.caption("Powered by Min-Heap DSA")
     st.divider()
 
+    # Stats from DB
     stats = get_task_stats()
-
     st.markdown(f"""
     <div class="stat-box">
         <div class="stat-number">{stats['pending']}</div>
@@ -130,12 +138,14 @@ with st.sidebar:
 
     st.divider()
 
+    # Priority legend
     st.markdown("#### Priority Legend")
     for p, (emoji, label) in PRIORITY_LABELS.items():
         st.markdown(f"{emoji} **{label}** — Level {p}")
 
     st.divider()
 
+    # Next up
     st.markdown("#### ⚡ Next Up")
     top = scheduler.peek_top_task()
     if top:
@@ -146,6 +156,18 @@ with st.sidebar:
             st.caption(f"📅 Due: {top.deadline}")
     else:
         st.caption("No tasks pending")
+
+    st.divider()
+
+    # Undo history
+    st.markdown("#### ↩️ Action History")
+    history = scheduler.get_undo_history()
+    if not history:
+        st.caption("No actions yet")
+    else:
+        for action in history[:5]:
+            icon = "➕" if action.action_type == "ADD" else "✅"
+            st.caption(f"{icon} {action.action_type}: {action.task_name[:15]}")
 
 # ── Main area ─────────────────────────────────────────────
 st.title("📋 Priority-Based Task Scheduler")
@@ -269,8 +291,8 @@ else:
 
 st.divider()
 
-# ── Quick Complete ────────────────────────────────────────
-col_quick, col_clear = st.columns(2)
+# ── Quick Complete + Undo + Clear ─────────────────────────
+col_quick, col_undo, col_clear = st.columns(3)
 
 with col_quick:
     if st.button("⚡ Complete Top Task", use_container_width=True, type="primary"):
@@ -280,6 +302,14 @@ with col_quick:
             removed = scheduler.remove_top_task()
             st.session_state.completed_count += 1
             st.toast(f"✅ Completed: {removed.name}")
+            st.rerun()
+
+with col_undo:
+    undo_label = f"↩️ Undo: {scheduler.undo_peek()}" if scheduler.can_undo() else "↩️ Nothing to Undo"
+    if st.button(undo_label, use_container_width=True, disabled=not scheduler.can_undo()):
+        result = scheduler.undo()
+        if result:
+            st.toast(f"↩️ {result}")
             st.rerun()
 
 with col_clear:
@@ -301,14 +331,14 @@ else:
     st.caption(f"{len(completed_tasks)} task(s) completed total")
     st.write("")
     for row in completed_tasks[:10]:
-        emoji = ["🔴", "🟠", "🟡", "🔵", "⚪"][row.priority - 1]
-        deadline_str = f" | 📅 {row.deadline}" if row.deadline else ""
-        cat = row.category if row.category else "General"
+        emoji = ["🔴", "🟠", "🟡", "🔵", "⚪"][row["priority"] - 1]
+        deadline_str = f" | 📅 {row['deadline']}" if row["deadline"] else ""
+        cat = row["category"] if row["category"] else "General"
         cat_icon = CATEGORY_CONFIG.get(cat, {"icon": "🌀"})["icon"]
         st.markdown(f"""
         <div class="completed-row">
-            {emoji} <s>{row.name}</s> &nbsp;|&nbsp;
-            Priority {row.priority} &nbsp;|&nbsp;
+            {emoji} <s>{row["name"]}</s> &nbsp;|&nbsp;
+            Priority {row["priority"]} &nbsp;|&nbsp;
             {cat_icon} {cat}{deadline_str}
         </div>
         """, unsafe_allow_html=True)
