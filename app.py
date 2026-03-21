@@ -1,6 +1,7 @@
 import streamlit as st
 from scheduler import TaskScheduler
 from visualizer import generate_heap_html
+from db_operations import get_completed_tasks, get_task_stats
 import streamlit.components.v1 as components
 
 # ── Page config ───────────────────────────────────────────
@@ -68,6 +69,15 @@ st.markdown("""
     div[data-testid="stSidebar"] {
         background: #181825;
     }
+    .completed-row {
+        padding: 8px 12px;
+        border-radius: 8px;
+        margin-bottom: 6px;
+        background: #1e1e2e;
+        border-left: 3px solid #a6e3a1;
+        color: #6c7086;
+        font-size: 0.85rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -102,34 +112,30 @@ with st.sidebar:
     st.caption("Powered by Min-Heap DSA")
     st.divider()
 
-    # Stats
-    total = scheduler.task_count()
-    completed = st.session_state.completed_count
+    stats = get_task_stats()
 
     st.markdown(f"""
     <div class="stat-box">
-        <div class="stat-number">{total}</div>
+        <div class="stat-number">{stats['pending']}</div>
         <div class="stat-label">Pending Tasks</div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown(f"""
     <div class="stat-box">
-        <div class="stat-number">{completed}</div>
-        <div class="stat-label">Completed Today</div>
+        <div class="stat-number">{stats['completed']}</div>
+        <div class="stat-label">Completed Total</div>
     </div>
     """, unsafe_allow_html=True)
 
     st.divider()
 
-    # Priority legend
     st.markdown("#### Priority Legend")
     for p, (emoji, label) in PRIORITY_LABELS.items():
         st.markdown(f"{emoji} **{label}** — Level {p}")
 
     st.divider()
 
-    # Top task preview
     st.markdown("#### ⚡ Next Up")
     top = scheduler.peek_top_task()
     if top:
@@ -232,7 +238,7 @@ else:
                 st.toast(f"Completed: {removed.name} 🎉")
                 st.rerun()
 
-                st.divider()
+st.divider()
 
 # ── Heap Visualizer ───────────────────────────────────────
 st.subheader("🌳 Live Heap Structure")
@@ -282,3 +288,27 @@ with col_clear:
         st.session_state.completed_count = 0
         st.toast("All tasks cleared!")
         st.rerun()
+
+st.divider()
+
+# ── Completed Task History ────────────────────────────────
+st.subheader("✅ Completed Tasks")
+completed_tasks = get_completed_tasks()
+
+if not completed_tasks:
+    st.caption("No completed tasks yet — complete some tasks above!")
+else:
+    st.caption(f"{len(completed_tasks)} task(s) completed total")
+    st.write("")
+    for row in completed_tasks[:10]:
+        emoji = ["🔴", "🟠", "🟡", "🔵", "⚪"][row.priority - 1]
+        deadline_str = f" | 📅 {row.deadline}" if row.deadline else ""
+        cat = row.category if row.category else "General"
+        cat_icon = CATEGORY_CONFIG.get(cat, {"icon": "🌀"})["icon"]
+        st.markdown(f"""
+        <div class="completed-row">
+            {emoji} <s>{row.name}</s> &nbsp;|&nbsp;
+            Priority {row.priority} &nbsp;|&nbsp;
+            {cat_icon} {cat}{deadline_str}
+        </div>
+        """, unsafe_allow_html=True)

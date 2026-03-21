@@ -1,35 +1,38 @@
 import heapq
 from task import Task
-from storage import save_tasks, load_tasks, clear_storage
+from db_operations import (
+    save_task_to_db,
+    load_tasks_from_db,
+    mark_task_complete,
+    delete_all_tasks
+)
 
 
 class TaskScheduler:
     def __init__(self):
         self._heap = []
         self._counter = 0
-        self._load()          # Auto-load on startup
+        self._load()
 
     def _load(self):
-        """Load saved tasks from disk."""
-        self._heap = load_tasks()
+        """Load tasks from SQLite into heap."""
+        self._heap = load_tasks_from_db()
         heapq.heapify(self._heap)
         if self._heap:
             self._counter = max(c for _, c, _ in self._heap) + 1
 
-    def _save(self):
-        """Save current tasks to disk."""
-        save_tasks(self._heap)
-
     def add_task(self, name: str, priority: int, deadline: str = None, category: str = "General"):
+        """Add task to heap AND database."""
         task = Task(priority=priority, name=name, deadline=deadline, category=category)
-        heapq.heappush(self._heap, (priority, self._counter, task))
+        task_id = save_task_to_db(task, self._counter)
+        heapq.heappush(self._heap, (priority, task_id, task))
         self._counter += 1
-        self._save()          # Auto-save after every change
 
     def remove_top_task(self):
+        """Remove highest priority task from heap AND mark done in DB."""
         if self._heap:
             _, _, task = heapq.heappop(self._heap)
-            self._save()
+            mark_task_complete(task.name, task.priority)
             return task
         return None
 
@@ -51,4 +54,4 @@ class TaskScheduler:
     def clear_all(self):
         self._heap = []
         self._counter = 0
-        clear_storage()
+        delete_all_tasks()
