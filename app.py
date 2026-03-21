@@ -1,5 +1,7 @@
 import streamlit as st
 from scheduler import TaskScheduler
+from visualizer import generate_heap_html
+import streamlit.components.v1 as components
 
 # ── Page config ───────────────────────────────────────────
 st.set_page_config(
@@ -78,6 +80,14 @@ if "completed_count" not in st.session_state:
 scheduler = st.session_state.scheduler
 
 # ── Priority helpers ──────────────────────────────────────
+CATEGORY_CONFIG = {
+    "Work":     {"icon": "💼", "color": "#89b4fa"},
+    "Personal": {"icon": "🏠", "color": "#a6e3a1"},
+    "Study":    {"icon": "📚", "color": "#f9e2af"},
+    "Health":   {"icon": "💪", "color": "#f38ba8"},
+    "Other":    {"icon": "🌀", "color": "#cba6f7"},
+}
+
 PRIORITY_LABELS = {
     1: ("🔴", "Critical"),
     2: ("🟠", "High"),
@@ -139,7 +149,7 @@ st.divider()
 # ── Add Task ──────────────────────────────────────────────
 st.subheader("➕ Add New Task")
 
-col1, col2, col3 = st.columns([3, 1, 2])
+col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
 
 with col1:
     task_name = st.text_input("Task Name", placeholder="e.g. Fix login bug")
@@ -152,6 +162,13 @@ with col2:
     )
 
 with col3:
+    category = st.selectbox(
+        "Category",
+        options=list(CATEGORY_CONFIG.keys()),
+        format_func=lambda x: f"{CATEGORY_CONFIG[x]['icon']} {x}"
+    )
+
+with col4:
     deadline = st.text_input("Deadline (optional)", placeholder="e.g. 2026-03-30")
     add_btn = st.button("➕ Add Task", use_container_width=True, type="primary")
 
@@ -162,7 +179,8 @@ if add_btn:
         scheduler.add_task(
             name=task_name.strip(),
             priority=priority,
-            deadline=deadline.strip() if deadline.strip() else None
+            deadline=deadline.strip() if deadline.strip() else None,
+            category=category
         )
         st.success(f"✅ **'{task_name}'** added as {PRIORITY_LABELS[priority][1]} priority!")
         st.rerun()
@@ -191,9 +209,15 @@ else:
         col_task, col_btn = st.columns([6, 1])
 
         with col_task:
+            cat = task.category if task.category in CATEGORY_CONFIG else "Other"
+            cat_icon = CATEGORY_CONFIG[cat]["icon"]
+            cat_color = CATEGORY_CONFIG[cat]["color"]
             st.markdown(f"""
             <div class="task-card priority-{task.priority}">
                 <span class="badge badge-{task.priority}">{emoji} {label}</span>
+                <span class="badge" style="background:{cat_color}22; color:{cat_color}">
+                    {cat_icon} {cat}
+                </span>
                 <p class="task-title">{task.name}</p>
                 <p class="task-meta">🕐 Added: {task.created_at}{deadline_str}</p>
             </div>
@@ -207,6 +231,35 @@ else:
                 st.session_state.completed_count += 1
                 st.toast(f"Completed: {removed.name} 🎉")
                 st.rerun()
+
+                st.divider()
+
+# ── Heap Visualizer ───────────────────────────────────────
+st.subheader("🌳 Live Heap Structure")
+st.caption("Visual representation of the Min-Heap tree — root always has highest priority")
+
+if scheduler.is_empty():
+    st.info("Add tasks to see the heap tree!")
+else:
+    col_viz, col_info = st.columns([3, 1])
+
+    with col_viz:
+        heap_html = generate_heap_html(scheduler._heap)
+        components.html(heap_html, height=500, scrolling=False)
+
+    with col_info:
+        st.markdown("#### How to read this")
+        st.markdown("""
+        - **Root node** = highest priority task (always served first)
+        - **Node index** = position in the heap array
+        - **Color** = priority level
+        - **Left/Right children** always have lower priority than parent
+        """)
+        st.divider()
+        st.markdown("#### Heap Array")
+        st.caption("Raw heap internal order:")
+        for i, (p, _, t) in enumerate(sorted(scheduler._heap)):
+            st.caption(f"`[{i}]` P{p} — {t.name[:15]}")
 
 st.divider()
 
@@ -225,7 +278,7 @@ with col_quick:
 
 with col_clear:
     if st.button("🗑️ Clear All Tasks", use_container_width=True):
-        st.session_state.scheduler = TaskScheduler()
+        scheduler.clear_all()
         st.session_state.completed_count = 0
         st.toast("All tasks cleared!")
         st.rerun()
