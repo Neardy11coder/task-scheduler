@@ -19,20 +19,48 @@ st.set_page_config(
 # ── Custom CSS ────────────────────────────────────────────
 st.markdown("""
 <style>
+    /* ── Dark theme (default) ── */
+    :root {
+        --bg-base:      #1e1e2e;
+        --bg-surface:   #181825;
+        --bg-card:      #1e1e2e;
+        --text-main:    #cdd6f4;
+        --text-muted:   #6c7086;
+        --text-sub:     #9ca0b0;
+        --accent:       #cba6f7;
+        --border:       #313244;
+        --border-light: #45475a;
+        --success:      #a6e3a1;
+        --chart-bg:     #1e1e2e;
+    }
+    /* ── Light theme overrides ── */
+    :root.light-theme {
+        --bg-base:      #eff1f5;
+        --bg-surface:   #dce0e8;
+        --bg-card:      #ffffff;
+        --text-main:    #4c4f69;
+        --text-muted:   #7c7f93;
+        --text-sub:     #9ca0b0;
+        --accent:       #7287fd;
+        --border:       #ccd0da;
+        --border-light: #bcc0cc;
+        --success:      #40a02b;
+        --chart-bg:     #ffffff;
+    }
     .task-card {
-        background: #1e1e2e;
+        background: var(--bg-card);
         border-radius: 12px;
         padding: 16px 20px;
         margin-bottom: 12px;
-        border-left: 5px solid #cdd6f4;
+        border-left: 5px solid var(--text-main);
     }
     .priority-1 { border-left-color: #f38ba8; }
     .priority-2 { border-left-color: #fab387; }
     .priority-3 { border-left-color: #f9e2af; }
     .priority-4 { border-left-color: #89b4fa; }
     .priority-5 { border-left-color: #a6e3a1; }
-    .task-title { font-size: 1.1rem; font-weight: 700; color: #cdd6f4; margin: 0; }
-    .task-meta { font-size: 0.8rem; color: #6c7086; margin-top: 4px; }
+    .task-title { font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin: 0; }
+    .task-meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
     .badge {
         display: inline-block; padding: 2px 10px;
         border-radius: 20px; font-size: 0.75rem;
@@ -44,24 +72,33 @@ st.markdown("""
     .badge-4 { background: #89b4fa22; color: #89b4fa; }
     .badge-5 { background: #a6e3a122; color: #a6e3a1; }
     .stat-box {
-        background: #1e1e2e; border-radius: 10px;
+        background: var(--bg-card); border-radius: 10px;
         padding: 16px; text-align: center; margin-bottom: 12px;
+        border: 1px solid var(--border);
     }
-    .stat-number { font-size: 2rem; font-weight: 800; color: #cba6f7; }
-    .stat-label { font-size: 0.8rem; color: #6c7086; }
-    div[data-testid="stSidebar"] { background: #181825; }
+    .stat-number { font-size: 2rem; font-weight: 800; color: var(--accent); }
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); }
+    div[data-testid="stSidebar"] { background: var(--bg-surface) !important; }
     .completed-row {
         padding: 8px 12px; border-radius: 8px; margin-bottom: 6px;
-        background: #1e1e2e; border-left: 3px solid #a6e3a1;
-        color: #6c7086; font-size: 0.85rem;
+        background: var(--bg-card); border-left: 3px solid var(--success);
+        color: var(--text-muted); font-size: 0.85rem;
     }
     .auth-box {
         max-width: 420px; margin: 60px auto;
-        background: #1e1e2e; border-radius: 16px;
-        padding: 40px; border: 1px solid #313244;
+        background: var(--bg-card); border-radius: 16px;
+        padding: 40px; border: 1px solid var(--border);
     }
+    /* Theme transition */
+    *, *::before, *::after { transition: background-color 0.25s ease, color 0.2s ease, border-color 0.2s ease; }
 </style>
 """, unsafe_allow_html=True)
+
+# ── Theme injection ────────────────────────────────────────
+if st.session_state.get("theme", "dark") == "light":
+    st.markdown('<script>document.documentElement.classList.add("light-theme");</script>', unsafe_allow_html=True)
+else:
+    st.markdown('<script>document.documentElement.classList.remove("light-theme");</script>', unsafe_allow_html=True)
 
 # ── Config helpers ────────────────────────────────────────
 CATEGORY_CONFIG = {
@@ -91,6 +128,8 @@ if "completed_count" not in st.session_state:
     st.session_state.completed_count = 0
 if "pomodoro_count" not in st.session_state:
     st.session_state.pomodoro_count = 0
+if "theme" not in st.session_state:
+    st.session_state.theme = "dark"
 
 # ── Auth screen ───────────────────────────────────────────
 if not st.session_state.logged_in:
@@ -160,6 +199,14 @@ user_id   = st.session_state.user_id
 with st.sidebar:
     st.markdown(f"## 📋 Task Scheduler")
     st.caption(f"Logged in as **{st.session_state.username}**")
+
+    # ── Theme Toggle ──
+    _is_dark = st.session_state.theme == "dark"
+    _toggle_label = "☀️ Light Mode" if _is_dark else "🌙 Dark Mode"
+    if st.button(_toggle_label, use_container_width=True):
+        st.session_state.theme = "light" if _is_dark else "dark"
+        st.rerun()
+
     st.divider()
 
     # ── Gamification Profile ──
@@ -262,6 +309,21 @@ with st.sidebar:
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
+
+# ── Theme-aware Python color palette ─────────────────────
+_dark = st.session_state.theme == "dark"
+T = {
+    "bg_base":    "#1e1e2e" if _dark else "#eff1f5",
+    "bg_surface": "#181825" if _dark else "#dce0e8",
+    "bg_card":    "#1e1e2e" if _dark else "#ffffff",
+    "text_main":  "#cdd6f4" if _dark else "#4c4f69",
+    "text_muted": "#6c7086" if _dark else "#7c7f93",
+    "accent":     "#cba6f7" if _dark else "#7287fd",
+    "border":     "#313244" if _dark else "#ccd0da",
+    "grid":       "#313244" if _dark else "#e0e4ef",
+    "success":    "#a6e3a1" if _dark else "#40a02b",
+    "chart_bg":   "#1e1e2e" if _dark else "#ffffff",
+}
 
 # ── Main area ─────────────────────────────────────────────
 st.title("📋 Priority-Based Task Scheduler")
@@ -780,12 +842,12 @@ else:
 
         # Exam countdown card with live JS timer
         countdown_html = f"""
-        <div style="background:#1e1e2e; border-radius:12px; padding:16px 20px;
+        <div style="background:{T['bg_card']}; border-radius:12px; padding:16px 20px;
                     border-left:5px solid {urgency_color}; margin-bottom:12px;
                     display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <div style="font-size:1.15rem; font-weight:700; color:#cdd6f4;">📚 {exam['subject']}</div>
-                <div style="font-size:0.8rem; color:#6c7086; margin-top:4px;">📅 {exam['exam_date']}</div>
+                <div style="font-size:1.15rem; font-weight:700; color:{T['text_main']};">📚 {exam['subject']}</div>
+                <div style="font-size:0.8rem; color:{T['text_muted']}; margin-top:4px;">📅 {exam['exam_date']}</div>
             </div>
             <div style="text-align:right;">
                 <div style="font-size:1.4rem; font-weight:800; color:{urgency_color};" id="countdown-{exam['id']}">
@@ -970,12 +1032,12 @@ else:
                 labels=cats, values=counts, hole=0.5,
                 marker=dict(colors=colors[:len(cats)]),
                 textinfo="label+percent",
-                textfont=dict(color="#cdd6f4", size=12),
+                textfont=dict(color=T["text_main"], size=12),
             )])
             fig_pie.update_layout(
-                title=dict(text="Tasks by Category", font=dict(color="#cdd6f4", size=14)),
-                paper_bgcolor="#1e1e2e", plot_bgcolor="#1e1e2e",
-                font=dict(color="#cdd6f4"), showlegend=False,
+                title=dict(text="Tasks by Category", font=dict(color=T["text_main"], size=14)),
+                paper_bgcolor=T["chart_bg"], plot_bgcolor=T["chart_bg"],
+                font=dict(color=T["text_main"]), showlegend=False,
                 margin=dict(t=40, b=20, l=20, r=20), height=300,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
@@ -988,14 +1050,14 @@ else:
             x=priority_labels, y=priority_values,
             marker_color=priority_colors,
             text=priority_values, textposition="outside",
-            textfont=dict(color="#cdd6f4"),
+            textfont=dict(color=T["text_main"]),
         )])
         fig_bar.update_layout(
-            title=dict(text="Tasks by Priority", font=dict(color="#cdd6f4", size=14)),
-            paper_bgcolor="#1e1e2e", plot_bgcolor="#1e1e2e",
-            font=dict(color="#cdd6f4"),
-            xaxis=dict(tickfont=dict(color="#cdd6f4"), gridcolor="#313244"),
-            yaxis=dict(tickfont=dict(color="#cdd6f4"), gridcolor="#313244"),
+            title=dict(text="Tasks by Priority", font=dict(color=T["text_main"], size=14)),
+            paper_bgcolor=T["chart_bg"], plot_bgcolor=T["chart_bg"],
+            font=dict(color=T["text_main"]),
+            xaxis=dict(tickfont=dict(color=T["text_main"]), gridcolor=T["grid"]),
+            yaxis=dict(tickfont=dict(color=T["text_main"]), gridcolor=T["grid"]),
             margin=dict(t=40, b=20, l=20, r=20), height=300,
         )
         st.plotly_chart(fig_bar, use_container_width=True)
@@ -1004,18 +1066,18 @@ else:
         days   = sorted(data["daily_counts"].keys())
         counts = [data["daily_counts"][d] for d in days]
         fig_line = go.Figure(data=[go.Bar(
-            x=days, y=counts, marker_color="#cba6f7",
+            x=days, y=counts, marker_color=T["accent"],
             text=counts, textposition="outside",
-            textfont=dict(color="#cdd6f4"),
+            textfont=dict(color=T["text_main"]),
         )])
         fig_line.update_layout(
-            title=dict(text="Tasks Completed Per Day", font=dict(color="#cdd6f4", size=14)),
-            paper_bgcolor="#1e1e2e", plot_bgcolor="#1e1e2e",
-            font=dict(color="#cdd6f4"),
-            xaxis=dict(tickfont=dict(color="#cdd6f4"), gridcolor="#313244"),
+            title=dict(text="Tasks Completed Per Day", font=dict(color=T["text_main"], size=14)),
+            paper_bgcolor=T["chart_bg"], plot_bgcolor=T["chart_bg"],
+            font=dict(color=T["text_main"]),
+            xaxis=dict(tickfont=dict(color=T["text_main"]), gridcolor=T["grid"]),
             yaxis=dict(
-                tickfont=dict(color="#cdd6f4"), gridcolor="#313244",
-                title=dict(text="Tasks Completed", font=dict(color="#6c7086"))
+                tickfont=dict(color=T["text_main"]), gridcolor=T["grid"],
+                title=dict(text="Tasks Completed", font=dict(color=T["text_muted"]))
             ),
             margin=dict(t=40, b=20, l=20, r=20), height=280,
         )
@@ -1040,11 +1102,11 @@ else:
             score_label = "Just Starting 🌱"
 
         st.markdown(f"""
-        <div style="background:#1e1e2e; border-radius:12px; padding:20px;
+        <div style="background:{T['bg_card']}; border-radius:12px; padding:20px;
                     text-align:center; border: 2px solid {score_color};">
             <div style="font-size:2.5rem; font-weight:800; color:{score_color}">{rate}%</div>
             <div style="font-size:1rem; color:{score_color}; margin-top:4px;">{score_label}</div>
-            <div style="font-size:0.75rem; color:#6c7086; margin-top:8px;">Completion Rate</div>
+            <div style="font-size:0.75rem; color:{T['text_muted']}; margin-top:8px;">Completion Rate</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1093,13 +1155,13 @@ if lb_mode == "🏅 Top XP":
         avatar = get_avatar(row.get("level", 1))
         score = row.get("xp", 0)
         is_me = row["user_id"] == user_id
-        border = "#a6e3a1" if is_me else "#313244"
+        border = T["success"] if is_me else T["border"]
         st.markdown(f"""
-        <div style="background:#1e1e2e; border-radius:10px; padding:12px 20px;
+        <div style="background:{T['bg_card']}; border-radius:10px; padding:12px 20px;
                     border:2px solid {border}; margin-bottom:8px;
                     display:flex; align-items:center; justify-content:space-between">
             <span style="font-size:1.3rem">{medal}</span>
-            <span style="flex:1; margin-left:14px; color:#cdd6f4; font-weight:600">{avatar} {name}</span>
+            <span style="flex:1; margin-left:14px; color:{T['text_main']}; font-weight:600">{avatar} {name}</span>
             <span style="color:#f9e2af; font-weight:800; font-size:1.1rem">{score:,} XP</span>
         </div>
         """, unsafe_allow_html=True)
@@ -1112,13 +1174,13 @@ elif lb_mode == "🔥 Top Streaks":
         avatar = get_avatar(row.get("level", 1))
         score = row.get("highest_streak", 0)
         is_me = row["user_id"] == user_id
-        border = "#a6e3a1" if is_me else "#313244"
+        border = T["success"] if is_me else T["border"]
         st.markdown(f"""
-        <div style="background:#1e1e2e; border-radius:10px; padding:12px 20px;
+        <div style="background:{T['bg_card']}; border-radius:10px; padding:12px 20px;
                     border:2px solid {border}; margin-bottom:8px;
                     display:flex; align-items:center; justify-content:space-between">
             <span style="font-size:1.3rem">{medal}</span>
-            <span style="flex:1; margin-left:14px; color:#cdd6f4; font-weight:600">{avatar} {name}</span>
+            <span style="flex:1; margin-left:14px; color:{T['text_main']}; font-weight:600">{avatar} {name}</span>
             <span style="color:#fab387; font-weight:800; font-size:1.1rem">🔥 {score} days</span>
         </div>
         """, unsafe_allow_html=True)
@@ -1130,13 +1192,13 @@ elif lb_mode == "✅ Most Tasks Completed":
         medal = MEDAL.get(i, f"#{i+1}")
         score = row.get("completed_tasks", 0)
         is_me = row["user_id"] == user_id
-        border = "#a6e3a1" if is_me else "#313244"
+        border = T["success"] if is_me else T["border"]
         st.markdown(f"""
-        <div style="background:#1e1e2e; border-radius:10px; padding:12px 20px;
+        <div style="background:{T['bg_card']}; border-radius:10px; padding:12px 20px;
                     border:2px solid {border}; margin-bottom:8px;
                     display:flex; align-items:center; justify-content:space-between">
             <span style="font-size:1.3rem">{medal}</span>
-            <span style="flex:1; margin-left:14px; color:#cdd6f4; font-weight:600">🌀 {name}</span>
+            <span style="flex:1; margin-left:14px; color:{T['text_main']}; font-weight:600">🌀 {name}</span>
             <span style="color:#a6e3a1; font-weight:800; font-size:1.1rem">✅ {score} tasks</span>
         </div>
         """, unsafe_allow_html=True)
