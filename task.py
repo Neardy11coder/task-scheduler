@@ -17,6 +17,7 @@ class Task:
     subtasks: list = field(default_factory=list, compare=False)
     dependencies: list = field(default_factory=list, compare=False)
     recurrence: Optional[dict] = field(default=None, compare=False)
+    tags: list = field(default_factory=list, compare=False)
 
     def __str__(self):
         deadline_str = f" | Deadline: {self.deadline}" if self.deadline else ""

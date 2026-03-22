@@ -355,11 +355,30 @@ st.divider()
 
 # ── Active Tasks (Checklists) ─────────────────────────────
 st.subheader("🔥 Active Tasks")
-pending_tasks = scheduler.get_all_tasks()
+all_pending = scheduler.get_all_tasks()
 
-if not pending_tasks:
+if not all_pending:
     st.info("No active tasks! Add one below.")
 else:
+    # --- Filter UI ---
+    all_tags = sorted(list(set(tag for t in all_pending for tag in getattr(t, "tags", []))))
+    all_cats = sorted(list(set(t.category for t in all_pending)))
+    
+    filt_col1, filt_col2 = st.columns(2)
+    with filt_col1:
+        cat_filter = st.multiselect("Filter by Category", all_cats, placeholder="All Categories")
+    with filt_col2:
+        tag_filter = st.multiselect("Filter by Tags", all_tags, placeholder="All Tags")
+        
+    pending_tasks = all_pending
+    if cat_filter:
+        pending_tasks = [t for t in pending_tasks if t.category in cat_filter]
+    if tag_filter:
+        pending_tasks = [t for t in pending_tasks if any(tag in getattr(t, "tags", []) for tag in tag_filter)]
+
+    if not pending_tasks:
+        st.info("No tasks match your filters.")
+        
     for task in pending_tasks:
         emoji, label = PRIORITY_LABELS[task.priority]
         cat_icon = CATEGORY_CONFIG.get(task.category, {"icon": "🌀"})["icon"]
@@ -372,6 +391,11 @@ else:
             if r_type == "daily": recur_str = " | 🔁 Daily"
             elif r_type == "weekly": recur_str = " | 🔁 Weekly"
             elif r_type == "interval": recur_str = f" | 🔁 Every {task_recur.get('days', 2)} days"
+
+        tag_badges = ""
+        task_tags = getattr(task, "tags", [])
+        if task_tags:
+            tag_badges = " " + " ".join([f"`#{t}`" for t in task_tags])
 
         total_sub = len(task.subtasks)
         completed_sub = sum(1 for s in task.subtasks if s.get("completed", False))
@@ -386,7 +410,7 @@ else:
                 blocking_names = [t.name for t in pending_tasks if t.db_id in getattr(task, "dependencies", [])]
                 st.error(f"Requires: {', '.join(blocking_names)}")
 
-            st.caption(f"{label} Priority | {cat_icon} {task.category}{deadline_str}{recur_str}")
+            st.caption(f"{label} Priority | {cat_icon} {task.category}{deadline_str}{recur_str}{tag_badges}")
             
             if total_sub > 0:
                 for i, sub in enumerate(task.subtasks):
@@ -468,6 +492,7 @@ selected_deps = st.multiselect(
     format_func=lambda x: dep_names[x]
 )
 
+tags_input = st.text_input("Tags (Optional, comma-separated)", placeholder="e.g. study, urgent, chores")
 subtasks_text = st.text_area("Sub-tasks (Optional)", placeholder="Buy domain\nDesign logo", height=100)
 add_btn = st.button("➕ Add Task", use_container_width=True, type="primary")
 
@@ -485,6 +510,7 @@ if add_btn:
                 if line.strip():
                     subtasks_list.append({"text": line.strip(), "completed": False})
                     
+        parsed_tags = [t.strip().lower() for t in tags_input.split(",")] if tags_input.strip() else []
         scheduler.add_task(
             name=task_name.strip(),
             priority=priority,
@@ -492,7 +518,8 @@ if add_btn:
             category=category,
             subtasks=subtasks_list,
             dependencies=selected_deps,
-            recurrence=recurrence_dict
+            recurrence=recurrence_dict,
+            tags=parsed_tags
         )
         st.success(f"✅ **'{task_name}'** added as {PRIORITY_LABELS[priority][1]} priority!")
         st.rerun()

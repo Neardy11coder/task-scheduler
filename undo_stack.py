@@ -14,6 +14,7 @@ class Action:
     subtasks: list = field(default_factory=list)
     dependencies: list = field(default_factory=list)
     recurrence: dict | None = field(default=None)
+    tags: list = field(default_factory=list)
 
 class UndoStack:
     """

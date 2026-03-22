@@ -24,12 +24,14 @@ class TaskScheduler:
         if self._heap:
             self._counter = max(c for _, c, _ in self._heap) + 1
 
-    def add_task(self, name: str, priority: int, deadline: str | None = None, category: str = "General", subtasks: list = None, dependencies: list = None, recurrence: dict | None = None):
+    def add_task(self, name: str, priority: int, deadline: str | None = None, category: str = "General", subtasks: list = None, dependencies: list = None, recurrence: dict | None = None, tags: list = None):
         if subtasks is None:
             subtasks = []
         if dependencies is None:
             dependencies = []
-        task = Task(priority=priority, name=name, deadline=deadline, category=category, subtasks=subtasks, dependencies=dependencies, recurrence=recurrence)
+        if tags is None:
+            tags = []
+        task = Task(priority=priority, name=name, deadline=deadline, category=category, subtasks=subtasks, dependencies=dependencies, recurrence=recurrence, tags=tags)
         task_id = save_task_to_db(task, self._counter, self._user_id)
         task.db_id = task_id
         heapq.heappush(self._heap, (priority, task_id, task))
@@ -43,7 +45,8 @@ class TaskScheduler:
             created_at=task.created_at,
             subtasks=subtasks,
             dependencies=dependencies,
-            recurrence=recurrence
+            recurrence=recurrence,
+            tags=tags
         ))
 
     def remove_top_task(self):
@@ -59,7 +62,8 @@ class TaskScheduler:
                 created_at=task.created_at,
                 subtasks=task.subtasks,
                 dependencies=getattr(task, "dependencies", []),
-                recurrence=getattr(task, "recurrence", None)
+                recurrence=getattr(task, "recurrence", None),
+                tags=getattr(task, "tags", [])
             ))
             return task
         return None
@@ -88,7 +92,8 @@ class TaskScheduler:
                 category=action.category,
                 subtasks=action.subtasks,
                 dependencies=getattr(action, "dependencies", []),
-                recurrence=getattr(action, "recurrence", None)
+                recurrence=getattr(action, "recurrence", None),
+                tags=getattr(action, "tags", [])
             )
             task_id = restore_task_in_db(
                 action.task_name, action.priority, self._user_id
