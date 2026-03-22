@@ -15,6 +15,7 @@ class Task:
     category: str = field(default="General", compare=False)
     db_id: Optional[int] = field(default=None, compare=False)
     subtasks: list = field(default_factory=list, compare=False)
+    dependencies: list = field(default_factory=list, compare=False)
 
     def __str__(self):
         deadline_str = f" | Deadline: {self.deadline}" if self.deadline else ""

@@ -12,6 +12,7 @@ class Action:
     deadline: str = None
     created_at: str = None
     subtasks: list = field(default_factory=list)
+    dependencies: list = field(default_factory=list)
 
 class UndoStack:
     """

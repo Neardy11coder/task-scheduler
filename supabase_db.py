@@ -32,6 +32,7 @@ def save_task_to_db(task, counter: int, user_id: str = "default") -> int:
         "deadline":   task.deadline,
         "created_at": task.created_at,
         "subtasks":   task.subtasks,
+        "dependencies": task.dependencies,
         "completed":  0
     }
     result = supabase.table("tasks").insert(data).execute()
@@ -53,7 +54,8 @@ def load_tasks_from_db(user_id: str = "default") -> list:
             deadline=row.get("deadline"),
             created_at=row["created_at"],
             category=row.get("category", "General"),
-            subtasks=row.get("subtasks") or []
+            subtasks=row.get("subtasks") or [],
+            dependencies=row.get("dependencies") or []
         )
         task.db_id = row["id"]
         heap.append((row["priority"], row["id"], task))

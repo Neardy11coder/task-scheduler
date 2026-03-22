@@ -24,10 +24,12 @@ class TaskScheduler:
         if self._heap:
             self._counter = max(c for _, c, _ in self._heap) + 1
 
-    def add_task(self, name: str, priority: int, deadline: str | None = None, category: str = "General", subtasks: list = None):
+    def add_task(self, name: str, priority: int, deadline: str | None = None, category: str = "General", subtasks: list = None, dependencies: list = None):
         if subtasks is None:
             subtasks = []
-        task = Task(priority=priority, name=name, deadline=deadline, category=category, subtasks=subtasks)
+        if dependencies is None:
+            dependencies = []
+        task = Task(priority=priority, name=name, deadline=deadline, category=category, subtasks=subtasks, dependencies=dependencies)
         task_id = save_task_to_db(task, self._counter, self._user_id)
         task.db_id = task_id
         heapq.heappush(self._heap, (priority, task_id, task))
@@ -39,7 +41,8 @@ class TaskScheduler:
             category=category,
             deadline=deadline,
             created_at=task.created_at,
-            subtasks=subtasks
+            subtasks=subtasks,
+            dependencies=dependencies
         ))
 
     def remove_top_task(self):
@@ -53,7 +56,8 @@ class TaskScheduler:
                 category=task.category,
                 deadline=task.deadline,
                 created_at=task.created_at,
-                subtasks=task.subtasks
+                subtasks=task.subtasks,
+                dependencies=task.dependencies
             ))
             return task
         return None
@@ -80,7 +84,8 @@ class TaskScheduler:
                 deadline=action.deadline,
                 created_at=action.created_at,
                 category=action.category,
-                subtasks=action.subtasks
+                subtasks=action.subtasks,
+                dependencies=action.dependencies
             )
             task_id = restore_task_in_db(
                 action.task_name, action.priority, self._user_id
