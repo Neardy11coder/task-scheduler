@@ -8,11 +8,12 @@ class Action:
     action_type: str        # "ADD", "COMPLETE", "CLEAR"
     task_name: str
     priority: int
-    category: str = "General"
     deadline: str = None
     created_at: str = None
+    category: str = field(default="General")
     subtasks: list = field(default_factory=list)
     dependencies: list = field(default_factory=list)
+    recurrence: dict | None = field(default=None)
 
 class UndoStack:
     """

@@ -283,8 +283,18 @@ with st.sidebar:
         if is_locked:
             blocking_names = [t[1] for t in scheduler._heap if t[1] in getattr(top, "dependencies", [])]
             st.error(f"Waiting on: {', '.join(blocking_names)}")
+        recur_str = ""
+        top_recur = getattr(top, "recurrence", None)
+        if top_recur:
+            r_type = top_recur.get("type", "")
+            if r_type == "daily": recur_str = " | 🔁 Daily"
+            elif r_type == "weekly": recur_str = " | 🔁 Weekly"
+            elif r_type == "interval": recur_str = f" | 🔁 Every {top_recur.get('days', 2)} days"
+
         if top.deadline:
-            st.caption(f"📅 Due: {top.deadline}")
+            st.caption(f"📅 Due: {top.deadline}{recur_str}")
+        elif recur_str:
+            st.caption(recur_str.strip(" | "))
     else:
         st.caption("No tasks pending")
 
@@ -355,6 +365,14 @@ else:
         cat_icon = CATEGORY_CONFIG.get(task.category, {"icon": "🌀"})["icon"]
         deadline_str = f" | 📅 {task.deadline}" if task.deadline else ""
         
+        recur_str = ""
+        task_recur = getattr(task, "recurrence", None)
+        if task_recur:
+            r_type = task_recur.get("type", "")
+            if r_type == "daily": recur_str = " | 🔁 Daily"
+            elif r_type == "weekly": recur_str = " | 🔁 Weekly"
+            elif r_type == "interval": recur_str = f" | 🔁 Every {task_recur.get('days', 2)} days"
+
         total_sub = len(task.subtasks)
         completed_sub = sum(1 for s in task.subtasks if s.get("completed", False))
         prog_text = f" — {completed_sub}/{total_sub} done" if total_sub > 0 else ""
@@ -368,7 +386,7 @@ else:
                 blocking_names = [t.name for t in pending_tasks if t.db_id in getattr(task, "dependencies", [])]
                 st.error(f"Requires: {', '.join(blocking_names)}")
 
-            st.caption(f"{label} Priority | {cat_icon} {task.category}{deadline_str}")
+            st.caption(f"{label} Priority | {cat_icon} {task.category}{deadline_str}{recur_str}")
             
             if total_sub > 0:
                 for i, sub in enumerate(task.subtasks):
@@ -426,8 +444,22 @@ with col3:
 with col4:
     deadline = st.text_input("Deadline (optional)", placeholder="e.g. 2026-03-30")
 
-active_tasks_for_deps = [(t.db_id, t.name) for _, _, t in scheduler._heap if t.db_id is not None]
-dep_options = [t[0] for t in active_tasks_for_deps]
+recur_col, dep_col = st.columns(2)
+
+with recur_col:
+    recur_type = st.selectbox("🔁 Recurrence (Optional)", ["Does not repeat", "Daily", "Weekly", "Custom Interval"])
+    recur_days = 2
+    if recur_type == "Custom Interval":
+        recur_days = st.number_input("Repeat every X days", min_value=1, value=3)
+        
+    recurrence_dict = None
+    if recur_type == "Daily": recurrence_dict = {"type": "daily"}
+    elif recur_type == "Weekly": recurrence_dict = {"type": "weekly"}
+    elif recur_type == "Custom Interval": recurrence_dict = {"type": "interval", "days": recur_days}
+
+with dep_col:
+    active_tasks_for_deps = [(t.db_id, t.name) for _, _, t in scheduler._heap if t.db_id is not None]
+    dep_options = [t[0] for t in active_tasks_for_deps]
 dep_names = {t[0]: t[1] for t in active_tasks_for_deps}
 
 selected_deps = st.multiselect(
@@ -459,7 +491,8 @@ if add_btn:
             deadline=deadline.strip() if deadline.strip() else None,
             category=category,
             subtasks=subtasks_list,
-            dependencies=selected_deps
+            dependencies=selected_deps,
+            recurrence=recurrence_dict
         )
         st.success(f"✅ **'{task_name}'** added as {PRIORITY_LABELS[priority][1]} priority!")
         st.rerun()
@@ -970,6 +1003,34 @@ with col_quick:
             else:
                 removed = scheduler.remove_top_task()
                 st.session_state.completed_count += 1
+                
+                # --- Recurrence Logic ---
+                recur_rule = getattr(removed, "recurrence", None)
+                if recur_rule:
+                    from datetime import date, timedelta
+                    today = date.today()
+                    r_type = recur_rule.get("type")
+                    if r_type == "daily":
+                        next_date = today + timedelta(days=1)
+                    elif r_type == "weekly":
+                        next_date = today + timedelta(days=7)
+                    elif r_type == "interval":
+                        next_date = today + timedelta(days=recur_rule.get("days", 1))
+                    else:
+                        next_date = today
+
+                    reset_subtasks = [{"text": s["text"], "completed": False} for s in removed.subtasks]
+                    
+                    scheduler.add_task(
+                        name=removed.name,
+                        priority=removed.priority,
+                        deadline=str(next_date),
+                        category=removed.category,
+                        subtasks=reset_subtasks,
+                        dependencies=getattr(removed, "dependencies", []),
+                        recurrence=recur_rule
+                    )
+                    st.toast(f"🔁 Rescheduled '{removed.name}' for {next_date}!")
             
             # --- Gamification Hook ---
             stats_g = get_user_stats(user_id)
