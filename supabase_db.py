@@ -150,3 +150,30 @@ def get_analytics_data(user_id: str = "default") -> dict:
         "priority_counts": priority_counts,
         "daily_counts":    daily_counts,
     }
+
+
+# ── Exam operations ──────────────────────────────────────
+
+def save_exam(user_id: str, subject: str, exam_date: str) -> int:
+    """Insert a new exam into Supabase."""
+    data = {
+        "user_id":    user_id,
+        "subject":    subject,
+        "exam_date":  exam_date,
+        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    result = supabase.table("exams").insert(data).execute()
+    return result.data[0]["id"]
+
+
+def get_exams(user_id: str) -> list:
+    """Fetch all exams for a user."""
+    result = supabase.table("exams").select("*").eq(
+        "user_id", user_id
+    ).order("exam_date").execute()
+    return result.data
+
+
+def delete_exam(exam_id: int):
+    """Delete an exam by ID."""
+    supabase.table("exams").delete().eq("id", exam_id).execute()
