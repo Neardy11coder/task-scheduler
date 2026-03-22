@@ -241,6 +241,23 @@ with st.sidebar:
 
     st.divider()
 
+    st.markdown("#### 📅 Calendar Export")
+    from calendar_export import generate_ics
+    from supabase_db import get_exams
+    all_exams = get_exams(user_id)
+    ics_data = generate_ics(scheduler.get_all_tasks(), all_exams)
+    
+    st.download_button(
+        label="📤 Download (.ics)",
+        data=ics_data,
+        file_name="task_scheduler.ics",
+        mime="text/calendar",
+        use_container_width=True,
+        help="Import this file into Google Calendar or Apple Calendar!"
+    )
+
+    st.divider()
+
     if st.button("🚪 Logout", use_container_width=True):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
