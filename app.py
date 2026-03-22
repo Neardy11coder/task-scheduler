@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from scheduler import TaskScheduler
 from visualizer import generate_heap_html
-from supabase_db import get_completed_tasks, get_task_stats, get_analytics_data, save_exam, get_exams, delete_exam, get_user_stats, update_user_stats
+from supabase_db import get_completed_tasks, get_task_stats, get_analytics_data, save_exam, get_exams, delete_exam, get_user_stats, update_user_stats, get_leaderboard_xp, get_leaderboard_streak, get_leaderboard_tasks
 from auth_manager import sign_in, sign_up
 from gamification import get_avatar, get_level_threshold, get_xp_for_priority, calculate_streak
 import streamlit.components.v1 as components
@@ -1067,7 +1067,6 @@ else:
 st.divider()
 
 # ── Leaderboard ───────────────────────────────────────────
-from supabase_db import get_leaderboard_xp, get_leaderboard_streak, get_leaderboard_tasks
 
 st.subheader("🏆 Leaderboard")
 st.caption("compete with others — usernames are anonymized for privacy")
