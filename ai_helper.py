@@ -1,12 +1,21 @@
 import os
 import json
+import streamlit as st
 from typing import Any, Dict, List
 from groq import Groq
-from dotenv import load_dotenv
 
-load_dotenv()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+def get_secret(key: str) -> str:
+    """Read a secret from st.secrets (Streamlit Cloud) or os.getenv (local)."""
+    try:
+        return st.secrets[key]
+    except Exception:
+        from dotenv import load_dotenv
+        load_dotenv()
+        return os.getenv(key)
+
+
+client = Groq(api_key=get_secret("GROQ_API_KEY"))
 MODEL = "llama-3.3-70b-versatile"
 
 _cache = {}

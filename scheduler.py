@@ -24,7 +24,7 @@ class TaskScheduler:
         if self._heap:
             self._counter = max(c for _, c, _ in self._heap) + 1
 
-    def add_task(self, name: str, priority: int, deadline: str = None, category: str = "General"):
+    def add_task(self, name: str, priority: int, deadline: str | None = None, category: str = "General"):
         task = Task(priority=priority, name=name, deadline=deadline, category=category)
         task_id = save_task_to_db(task, self._counter, self._user_id)
         heapq.heappush(self._heap, (priority, task_id, task))
