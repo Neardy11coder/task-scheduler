@@ -225,3 +225,29 @@ def update_user_stats(user_id: str, stats: dict):
         "last_active_date": stats.get("last_active_date")
     }
     supabase.table("user_stats").upsert(payload).execute()
+
+
+# ── Leaderboard operations ──────────────────────────────────
+def get_leaderboard_xp(limit: int = 10) -> list:
+    """Fetch top users ranked by XP (descending)."""
+    result = supabase.table("user_stats").select("user_id, xp, level").order(
+        "xp", desc=True
+    ).limit(limit).execute()
+    return result.data
+
+def get_leaderboard_streak(limit: int = 10) -> list:
+    """Fetch top users ranked by highest ever streak (descending)."""
+    result = supabase.table("user_stats").select("user_id, highest_streak, level").order(
+        "highest_streak", desc=True
+    ).limit(limit).execute()
+    return result.data
+
+def get_leaderboard_tasks(limit: int = 10) -> list:
+    """Fetch top users ranked by number of completed tasks (descending)."""
+    result = supabase.table("tasks").select("user_id").eq("completed", 1).execute()
+    
+    # Count completed tasks per user manually
+    from collections import Counter
+    counts = Counter(row["user_id"] for row in result.data)
+    sorted_counts = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:limit]
+    return [{"user_id": uid, "completed_tasks": count} for uid, count in sorted_counts]
