@@ -186,3 +186,35 @@ def get_exams(user_id: str) -> list:
 def delete_exam(exam_id: int):
     """Delete an exam by ID."""
     supabase.table("exams").delete().eq("id", exam_id).execute()
+
+
+# ── Gamification operations ────────────────────────────────
+def get_user_stats(user_id: str) -> dict:
+    """Fetch user gamification stats, initializing if they don't exist."""
+    result = supabase.table("user_stats").select("*").eq("user_id", user_id).execute()
+    
+    if result.data:
+        return result.data[0]
+    else:
+        # Initialize default stats
+        return {
+            "user_id": user_id,
+            "xp": 0,
+            "level": 1,
+            "current_streak": 0,
+            "highest_streak": 0,
+            "last_active_date": None
+        }
+
+def update_user_stats(user_id: str, stats: dict):
+    """Update user gamification stats via upsert."""
+    # Add user_id to payload just in case
+    payload = {
+        "user_id": user_id,
+        "xp": stats.get("xp", 0),
+        "level": stats.get("level", 1),
+        "current_streak": stats.get("current_streak", 0),
+        "highest_streak": stats.get("highest_streak", 0),
+        "last_active_date": stats.get("last_active_date")
+    }
+    supabase.table("user_stats").upsert(payload).execute()

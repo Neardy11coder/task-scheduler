@@ -2,8 +2,9 @@ import streamlit as st
 import plotly.graph_objects as go
 from scheduler import TaskScheduler
 from visualizer import generate_heap_html
-from supabase_db import get_completed_tasks, get_task_stats, get_analytics_data, save_exam, get_exams, delete_exam
+from supabase_db import get_completed_tasks, get_task_stats, get_analytics_data, save_exam, get_exams, delete_exam, get_user_stats, update_user_stats
 from auth_manager import sign_in, sign_up
+from gamification import get_avatar, get_level_threshold, get_xp_for_priority, calculate_streak
 import streamlit.components.v1 as components
 from ai_helper import suggest_priority_and_category, generate_weekly_plan, generate_exam_tasks
 from datetime import datetime, date
@@ -159,6 +160,38 @@ user_id   = st.session_state.user_id
 with st.sidebar:
     st.markdown(f"## 📋 Task Scheduler")
     st.caption(f"Logged in as **{st.session_state.username}**")
+    st.divider()
+
+    # ── Gamification Profile ──
+    stats_g = get_user_stats(user_id)
+    
+    # Update daily streak if checked for the first time today
+    today_str = date.today().strftime("%Y-%m-%d")
+    if stats_g.get("last_active_date") != today_str:
+        new_streak = calculate_streak(stats_g.get("current_streak", 0), stats_g.get("last_active_date"))
+        stats_g["current_streak"] = new_streak
+        stats_g["last_active_date"] = today_str
+        if new_streak > stats_g.get("highest_streak", 0):
+            stats_g["highest_streak"] = new_streak
+        update_user_stats(user_id, stats_g)
+
+    # UI display
+    lvl = stats_g.get("level", 1)
+    xp = stats_g.get("xp", 0)
+    avatar = get_avatar(lvl)
+    
+    st.markdown(f"### {avatar} Level {lvl}")
+    
+    thresh = get_level_threshold(lvl)
+    prev_thresh = get_level_threshold(lvl - 1) if lvl > 1 else 0
+    xp_needed = thresh - prev_thresh
+    xp_into_level = xp - prev_thresh
+    progress = min(1.0, max(0.0, xp_into_level / xp_needed)) if xp_needed > 0 else 1.0
+    
+    st.progress(progress, text=f"{xp} / {thresh} XP")
+    
+    st.markdown(f"**🔥 Daily Streak:** {stats_g.get('current_streak', 0)} days")
+    st.caption(f"Best: {stats_g.get('highest_streak', 0)} days")
     st.divider()
 
     stats = get_task_stats(user_id)
@@ -772,7 +805,24 @@ with col_quick:
         else:
             removed = scheduler.remove_top_task()
             st.session_state.completed_count += 1
-            st.toast(f"✅ Completed: {removed.name}")
+            
+            # --- Gamification Hook ---
+            stats_g = get_user_stats(user_id)
+            gained_xp = get_xp_for_priority(removed.priority)
+            stats_g["xp"] = stats_g.get("xp", 0) + gained_xp
+            
+            leveled_up = False
+            while stats_g["xp"] >= get_level_threshold(stats_g.get("level", 1)):
+                stats_g["level"] = stats_g.get("level", 1) + 1
+                leveled_up = True
+            
+            update_user_stats(user_id, stats_g)
+            
+            if leveled_up:
+                st.balloons()
+                st.success(f"🎉 LEVEL UP! You are now Level {stats_g['level']}!")
+                
+            st.toast(f"✅ Completed: {removed.name} (+{gained_xp} XP)")
             st.rerun()
 
 with col_undo:
