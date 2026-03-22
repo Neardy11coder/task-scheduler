@@ -24,9 +24,12 @@ class TaskScheduler:
         if self._heap:
             self._counter = max(c for _, c, _ in self._heap) + 1
 
-    def add_task(self, name: str, priority: int, deadline: str | None = None, category: str = "General"):
-        task = Task(priority=priority, name=name, deadline=deadline, category=category)
+    def add_task(self, name: str, priority: int, deadline: str | None = None, category: str = "General", subtasks: list = None):
+        if subtasks is None:
+            subtasks = []
+        task = Task(priority=priority, name=name, deadline=deadline, category=category, subtasks=subtasks)
         task_id = save_task_to_db(task, self._counter, self._user_id)
+        task.db_id = task_id
         heapq.heappush(self._heap, (priority, task_id, task))
         self._counter += 1
         self._undo_stack.push(Action(
@@ -35,7 +38,8 @@ class TaskScheduler:
             priority=priority,
             category=category,
             deadline=deadline,
-            created_at=task.created_at
+            created_at=task.created_at,
+            subtasks=subtasks
         ))
 
     def remove_top_task(self):
@@ -48,7 +52,8 @@ class TaskScheduler:
                 priority=task.priority,
                 category=task.category,
                 deadline=task.deadline,
-                created_at=task.created_at
+                created_at=task.created_at,
+                subtasks=task.subtasks
             ))
             return task
         return None
@@ -74,12 +79,14 @@ class TaskScheduler:
                 name=action.task_name,
                 deadline=action.deadline,
                 created_at=action.created_at,
-                category=action.category
+                category=action.category,
+                subtasks=action.subtasks
             )
             task_id = restore_task_in_db(
                 action.task_name, action.priority, self._user_id
             )
             if task_id:
+                task.db_id = task_id
                 heapq.heappush(self._heap, (action.priority, task_id, task))
             return f"Undid COMPLETE — restored '{action.task_name}'"
 

@@ -11,7 +11,7 @@ class Action:
     category: str = "General"
     deadline: str = None
     created_at: str = None
-
+    subtasks: list = field(default_factory=list)
 
 class UndoStack:
     """

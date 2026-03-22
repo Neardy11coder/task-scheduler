@@ -251,6 +251,41 @@ st.title("📋 Priority-Based Task Scheduler")
 st.caption("Tasks are automatically sorted by urgency using a Min-Heap")
 st.divider()
 
+# ── Active Tasks (Checklists) ─────────────────────────────
+st.subheader("🔥 Active Tasks")
+pending_tasks = scheduler.get_all_tasks()
+
+if not pending_tasks:
+    st.info("No active tasks! Add one below.")
+else:
+    for task in pending_tasks:
+        emoji, label = PRIORITY_LABELS[task.priority]
+        cat_icon = CATEGORY_CONFIG.get(task.category, {"icon": "🌀"})["icon"]
+        deadline_str = f" | 📅 {task.deadline}" if task.deadline else ""
+        
+        total_sub = len(task.subtasks)
+        completed_sub = sum(1 for s in task.subtasks if s.get("completed", False))
+        prog_text = f" — {completed_sub}/{total_sub} done" if total_sub > 0 else ""
+        
+        with st.expander(f"{emoji} **{task.name}**{prog_text}", expanded=False):
+            st.caption(f"{label} Priority | {cat_icon} {task.category}{deadline_str}")
+            
+            if total_sub > 0:
+                for i, sub in enumerate(task.subtasks):
+                    sub_key = f"sub_{task.db_id}_{i}"
+                    is_checked = st.checkbox(sub["text"], value=sub.get("completed", False), key=sub_key)
+                    
+                    if is_checked != sub.get("completed", False):
+                        task.subtasks[i]["completed"] = is_checked
+                        # Use the actual update_task_subtasks to persist
+                        from supabase_db import update_task_subtasks
+                        update_task_subtasks(task.db_id, task.subtasks)
+                        st.rerun()
+            else:
+                st.caption("No sub-tasks.")
+
+st.divider()
+
 # ── Add Task ──────────────────────────────────────────────
 st.subheader("➕ Add New Task")
 
@@ -290,7 +325,9 @@ with col3:
 
 with col4:
     deadline = st.text_input("Deadline (optional)", placeholder="e.g. 2026-03-30")
-    add_btn = st.button("➕ Add Task", use_container_width=True, type="primary")
+
+subtasks_text = st.text_area("Sub-tasks (Optional)", placeholder="Buy domain\nDesign logo", height=100)
+add_btn = st.button("➕ Add Task", use_container_width=True, type="primary")
 
 # Show AI reasoning
 if ai_suggestion:
@@ -300,11 +337,18 @@ if add_btn:
     if task_name.strip() == "":
         st.error("⚠️ Task name cannot be empty!")
     else:
+        subtasks_list = []
+        if subtasks_text.strip():
+            for line in subtasks_text.split('\n'):
+                if line.strip():
+                    subtasks_list.append({"text": line.strip(), "completed": False})
+                    
         scheduler.add_task(
             name=task_name.strip(),
             priority=priority,
             deadline=deadline.strip() if deadline.strip() else None,
-            category=category
+            category=category,
+            subtasks=subtasks_list
         )
         st.success(f"✅ **'{task_name}'** added as {PRIORITY_LABELS[priority][1]} priority!")
         st.rerun()

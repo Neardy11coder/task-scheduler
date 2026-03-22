@@ -31,6 +31,7 @@ def save_task_to_db(task, counter: int, user_id: str = "default") -> int:
         "category":   task.category,
         "deadline":   task.deadline,
         "created_at": task.created_at,
+        "subtasks":   task.subtasks,
         "completed":  0
     }
     result = supabase.table("tasks").insert(data).execute()
@@ -51,10 +52,16 @@ def load_tasks_from_db(user_id: str = "default") -> list:
             name=row["name"],
             deadline=row.get("deadline"),
             created_at=row["created_at"],
-            category=row.get("category", "General")
+            category=row.get("category", "General"),
+            subtasks=row.get("subtasks") or []
         )
+        task.db_id = row["id"]
         heap.append((row["priority"], row["id"], task))
     return heap
+
+def update_task_subtasks(task_id: int, subtasks: list):
+    """Save checklist state for a specific task."""
+    supabase.table("tasks").update({"subtasks": subtasks}).eq("id", task_id).execute()
 
 
 def mark_task_complete(task_name: str, priority: int, user_id: str = "default"):
