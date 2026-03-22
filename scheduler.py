@@ -57,7 +57,7 @@ class TaskScheduler:
                 deadline=task.deadline,
                 created_at=task.created_at,
                 subtasks=task.subtasks,
-                dependencies=task.dependencies
+                dependencies=getattr(task, "dependencies", [])
             ))
             return task
         return None
@@ -85,7 +85,7 @@ class TaskScheduler:
                 created_at=action.created_at,
                 category=action.category,
                 subtasks=action.subtasks,
-                dependencies=action.dependencies
+                dependencies=getattr(action, "dependencies", [])
             )
             task_id = restore_task_in_db(
                 action.task_name, action.priority, self._user_id

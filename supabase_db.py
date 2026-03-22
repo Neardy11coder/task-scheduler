@@ -32,7 +32,7 @@ def save_task_to_db(task, counter: int, user_id: str = "default") -> int:
         "deadline":   task.deadline,
         "created_at": task.created_at,
         "subtasks":   task.subtasks,
-        "dependencies": task.dependencies,
+        "dependencies": getattr(task, "dependencies", []),
         "completed":  0
     }
     result = supabase.table("tasks").insert(data).execute()

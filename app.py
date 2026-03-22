@@ -275,13 +275,13 @@ with st.sidebar:
         emoji, label = PRIORITY_LABELS[top.priority]
         
         pending_ids = {t[1] for t in scheduler._heap if t[1] is not None}
-        is_locked = any(dep_id in pending_ids for dep_id in top.dependencies)
+        is_locked = any(dep_id in pending_ids for dep_id in getattr(top, "dependencies", []))
         lock_icon = " 🔒" if is_locked else ""
         
         st.markdown(f"{emoji} **{top.name}**{lock_icon}")
         st.caption(f"{label} priority")
         if is_locked:
-            blocking_names = [t[1] for t in scheduler._heap if t[1] in top.dependencies]
+            blocking_names = [t[1] for t in scheduler._heap if t[1] in getattr(top, "dependencies", [])]
             st.error(f"Waiting on: {', '.join(blocking_names)}")
         if top.deadline:
             st.caption(f"📅 Due: {top.deadline}")
@@ -360,12 +360,12 @@ else:
         prog_text = f" — {completed_sub}/{total_sub} done" if total_sub > 0 else ""
         
         pending_ids = {t.db_id for t in pending_tasks if t.db_id is not None}
-        is_blocked = any(dep_id in pending_ids for dep_id in task.dependencies)
+        is_blocked = any(dep_id in pending_ids for dep_id in getattr(task, "dependencies", []))
         lock_icon = "🔒 " if is_blocked else ""
 
         with st.expander(f"{lock_icon}{emoji} **{task.name}**{prog_text}", expanded=False):
             if is_blocked:
-                blocking_names = [t.name for t in pending_tasks if t.db_id in task.dependencies]
+                blocking_names = [t.name for t in pending_tasks if t.db_id in getattr(task, "dependencies", [])]
                 st.error(f"Requires: {', '.join(blocking_names)}")
 
             st.caption(f"{label} Priority | {cat_icon} {task.category}{deadline_str}")
@@ -958,7 +958,7 @@ with col_quick:
     pending_ids = {t[1] for t in scheduler._heap if t[1] is not None}
     is_top_locked = False
     if top_task:
-        is_top_locked = any(dep_id in pending_ids for dep_id in top_task.dependencies)
+        is_top_locked = any(dep_id in pending_ids for dep_id in getattr(top_task, "dependencies", []))
 
     if is_top_locked:
         st.button("🔒 Top Task is Locked", use_container_width=True, disabled=True)
