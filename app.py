@@ -311,6 +311,33 @@ with st.sidebar:
 
     st.divider()
 
+    st.markdown("#### 📥 Export Data")
+    from export_utils import generate_csv_payload, generate_markdown_report
+    
+    csv_data = generate_csv_payload(user_id)
+    if csv_data:
+        st.download_button(
+            label="📊 Download CSV",
+            data=csv_data,
+            file_name="tasks_export.csv",
+            mime="text/csv",
+            use_container_width=True,
+            help="Raw tabular data for Excel or spreadsheets"
+        )
+        
+    md_data = generate_markdown_report(user_id, scheduler.get_all_tasks())
+    if md_data:
+        st.download_button(
+            label="📜 Download Report (MD)",
+            data=md_data,
+            file_name="productivity_report.md",
+            mime="text/markdown",
+            use_container_width=True,
+            help="Beautifully formatted summary for Notion/Obsidian"
+        )
+
+    st.divider()
+
     st.markdown("#### 📅 Calendar Export")
     from calendar_export import generate_ics
     from supabase_db import get_exams
