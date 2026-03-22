@@ -97,6 +97,11 @@ st.markdown(f"""
         background: var(--bg-card); border-radius: 16px;
         padding: 40px; border: 1px solid var(--border);
     }}
+    /* Force Streamlit elements to use our text colors */
+    .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp span, .stApp label, .stApp li {{
+        color: var(--text-main) !important;
+    }}
+    .stMarkdown p {{ color: var(--text-main) !important; }}
     /* Theme transition */
     *, *::before, *::after {{ transition: background-color 0.25s ease, color 0.2s ease, border-color 0.2s ease; }}
 </style>
