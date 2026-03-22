@@ -104,6 +104,39 @@ st.markdown(f"""
     .stMarkdown p {{ color: var(--text-main) !important; }}
     /* Theme transition */
     *, *::before, *::after {{ transition: background-color 0.25s ease, color 0.2s ease, border-color 0.2s ease; }}
+    
+    /* ── Mobile Layout Optimizations ── */
+    @media (max-width: 768px) {{
+        .block-container {{
+            padding-top: 2rem !important;
+            padding-bottom: 2rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }}
+        h1 {{
+            font-size: 1.8rem !important;
+        }}
+        h2 {{
+            font-size: 1.5rem !important;
+        }}
+        h3 {{
+            font-size: 1.25rem !important;
+        }}
+        /* Tighten whitespace within expanders to boost density natively */
+        div[data-testid="stExpanderDetails"] {{
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+            padding-bottom: 0.5rem !important;
+        }}
+        /* Scale down the gamification sidebar numbers */
+        .stat-box {{
+            padding: 10px !important;
+            margin-bottom: 10px !important;
+        }}
+        .stat-number {{
+            font-size: 1.5rem !important;
+        }}
+    }}
 </style>
 """, unsafe_allow_html=True)
 
