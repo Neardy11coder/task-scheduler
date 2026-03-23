@@ -10,6 +10,7 @@ from components.exams import render_exams
 from components.calendar import render_calendar
 from components.analytics import render_analytics
 from components.leaderboard import render_leaderboard
+from components.pwa import render_pwa
 from visualizer import generate_heap_html
 import streamlit.components.v1 as components
 from datetime import date, timedelta
@@ -29,6 +30,9 @@ st.set_page_config(
 
 # Apply global CSS
 apply_custom_css()
+
+# Inject PWA tags
+render_pwa()
 
 # ── Session state init ────────────────────────────────────
 if "logged_in" not in st.session_state:
