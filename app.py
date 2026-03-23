@@ -168,6 +168,8 @@ if "completed_count" not in st.session_state:
     st.session_state.completed_count = 0
 if "pomodoro_count" not in st.session_state:
     st.session_state.pomodoro_count = 0
+if "play_audio" not in st.session_state:
+    st.session_state.play_audio = None
 
 # ── Auth screen ───────────────────────────────────────────
 if not st.session_state.logged_in:
@@ -410,8 +412,81 @@ T = {
 
 # ── Main area ─────────────────────────────────────────────
 st.title("📋 Priority-Based Task Scheduler")
+
+# Audio Player Component
+if st.session_state.play_audio:
+    sound_type = st.session_state.play_audio
+    st.session_state.play_audio = None
+    components.html(f"""
+    <script>
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      function play(type) {{
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          
+          if(type === 'complete') {{
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+              osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1);
+              gain.gain.setValueAtTime(0.2, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+              osc.start(ctx.currentTime);
+              osc.stop(ctx.currentTime + 0.4);
+          }} else if(type === 'add') {{
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(440, ctx.currentTime);
+              gain.gain.setValueAtTime(0.1, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+              osc.start(ctx.currentTime);
+              osc.stop(ctx.currentTime + 0.2);
+          }} else if(type === 'level_up') {{
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(440, ctx.currentTime);
+              osc.frequency.setValueAtTime(554.37, ctx.currentTime + 0.15);
+              osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.3);
+              osc.frequency.setValueAtTime(880, ctx.currentTime + 0.45);
+              gain.gain.setValueAtTime(0.2, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8);
+              osc.start(ctx.currentTime);
+              osc.stop(ctx.currentTime + 0.9);
+          }}
+      }}
+      play('{sound_type}');
+    </script>
+    """, height=0, width=0)
+
 st.caption("Tasks are automatically sorted by urgency using a Min-Heap")
 st.divider()
+
+# ── Global Search ─────────────────────────────────────────
+with st.expander("🔍 Global Search (Active & Completed Tasks)", expanded=False):
+    global_query = st.text_input("Search by task name, subtasks, or tags...", key="global_q")
+    if global_query.strip():
+        q = global_query.strip().lower()
+        # Search active tasks
+        all_act = scheduler.get_all_tasks()
+        found_act = [t for t in all_act if q in t.name.lower() or any(q in s.get("text","").lower() for s in getattr(t, "subtasks", [])) or any(q in tag.lower() for tag in getattr(t, "tags", []))]
+        
+        # Search completed tasks
+        all_comp = get_completed_tasks(st.session_state.user_id)
+        found_comp = [c for c in all_comp if q in c["name"].lower()]
+        
+        if not found_act and not found_comp:
+            st.info("No matching tasks found.")
+        else:
+            if found_act:
+                st.markdown("**🔥 Active Matches**")
+                for t in found_act:
+                    emoji, label = PRIORITY_LABELS[t.priority]
+                    deadline_str = f" | Due: {t.deadline}" if t.deadline else ""
+                    st.markdown(f"- {emoji} **{t.name}** (Priority {t.priority}){deadline_str}")
+            if found_comp:
+                st.markdown("**✅ Completed Matches**")
+                for c in found_comp:
+                    emoji = ["🔴", "🟠", "🟡", "🔵", "⚪"][c["priority"] - 1]
+                    deadline_str = f" | Due: {c['deadline']}" if c.get("deadline") else ""
+                    st.markdown(f"- {emoji} <s>{c['name']}</s> (Priority {c['priority']}){deadline_str}")
 
 # ── Active Tasks (Checklists) ─────────────────────────────
 st.subheader("🔥 Active Tasks")
@@ -424,6 +499,8 @@ else:
     all_tags = sorted(list(set(tag for t in all_pending for tag in getattr(t, "tags", []))))
     all_cats = sorted(list(set(t.category for t in all_pending)))
     
+    search_query = st.text_input("🔍 Search", placeholder="Search task name or subtasks...", label_visibility="collapsed")
+    
     filt_col1, filt_col2 = st.columns(2)
     with filt_col1:
         cat_filter = st.multiselect("Filter by Category", all_cats, placeholder="All Categories")
@@ -431,6 +508,13 @@ else:
         tag_filter = st.multiselect("Filter by Tags", all_tags, placeholder="All Tags")
         
     pending_tasks = all_pending
+    if search_query:
+        query_lower = search_query.strip().lower()
+        pending_tasks = [
+            t for t in pending_tasks 
+            if query_lower in t.name.lower() or 
+               any(query_lower in s.get("text", "").lower() for s in getattr(t, "subtasks", []))
+        ]
     if cat_filter:
         pending_tasks = [t for t in pending_tasks if t.category in cat_filter]
     if tag_filter:
@@ -582,6 +666,7 @@ if add_btn:
             tags=parsed_tags
         )
         st.success(f"✅ **'{task_name}'** added as {PRIORITY_LABELS[priority][1]} priority!")
+        st.session_state.play_audio = 'add'
         st.rerun()
 
 st.divider()
@@ -1043,6 +1128,112 @@ else:
 
 st.divider()
 
+# ── Interactive Calendar ──────────────────────────────────
+st.subheader("📆 Interactive Calendar")
+st.caption("View your exams and tasks with deadlines in a monthly calendar")
+
+import json
+calendar_events = []
+
+# Add active tasks with deadlines
+for t in scheduler.get_all_tasks():
+    if t.deadline:
+        calendar_events.append({
+            "title": f"[P{t.priority}] {t.name}",
+            "start": t.deadline,
+            "color": CATEGORY_CONFIG.get(t.category, {}).get("color", "#cba6f7"),
+            "allDay": True
+        })
+
+# Add exams
+for ex in exams:
+    calendar_events.append({
+        "title": f"📝 EXAM: {ex['subject']}",
+        "start": ex["exam_date"],
+        "color": "#f38ba8",
+        "allDay": True
+    })
+
+events_json = json.dumps(calendar_events)
+
+calendar_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+<style>
+  body {{
+    background: transparent;
+    color: {T['text_main']};
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    margin: 0; padding: 0;
+  }}
+  #calendar {{
+    max-width: 100%;
+    margin: 0 auto;
+    background: {T['bg_card']};
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid {T['border']};
+  }}
+  .fc-theme-standard td, .fc-theme-standard th {{
+    border-color: {T['grid']} !important;
+  }}
+  .fc-button {{
+    background: {T['bg_surface']} !important;
+    border: 1px solid {T['border']} !important;
+    color: {T['text_main']} !important;
+    text-transform: capitalize !important;
+    box-shadow: none !important;
+  }}
+  .fc-button-primary:not(:disabled):active, .fc-button-primary:not(:disabled).fc-button-active {{
+    background: {T['accent']} !important;
+    color: {T['bg_base']} !important;
+    border-color: {T['accent']} !important;
+  }}
+  .fc-col-header-cell-cushion {{ color: {T['text_main']} !important; }}
+  .fc-event {{
+    border: none !important;
+    padding: 3px 6px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }}
+  .fc-daygrid-day-number {{
+    color: {T['text_muted']};
+    text-decoration: none;
+  }}
+  .fc-toolbar-title {{
+    font-size: 1.2rem !important;
+    color: {T['text_main']} !important;
+  }}
+</style>
+</head>
+<body>
+<div id="calendar"></div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {{
+    var calendarEl = document.getElementById('calendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, {{
+      initialView: 'dayGridMonth',
+      headerToolbar: {{
+        left: 'title',
+        right: 'prev,next today'
+      }},
+      events: {events_json},
+      height: 550
+    }});
+    calendar.render();
+  }});
+</script>
+</body>
+</html>
+"""
+components.html(calendar_html, height=580, scrolling=False)
+
+st.divider()
+
 # ── Heap Visualizer ───────────────────────────────────────
 st.subheader("🌳 Live Heap Structure")
 st.caption("Visual representation of the Min-Heap tree — root always has highest priority")
@@ -1136,6 +1327,7 @@ with col_quick:
                 st.success(f"🎉 LEVEL UP! You are now Level {stats_g['level']}!")
                 
             st.toast(f"✅ Completed: {removed.name} (+{gained_xp} XP)")
+            st.session_state.play_audio = 'level_up' if leveled_up else 'complete'
             st.rerun()
 
 with col_undo:
