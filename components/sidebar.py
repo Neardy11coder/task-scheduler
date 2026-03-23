@@ -58,14 +58,14 @@ def render_sidebar():
         stats = get_task_stats(user_id)
         st.markdown(f'''
         <div class="stat-box">
-            <div class="stat-number">{{stats['pending']}}</div>
+            <div class="stat-number">{stats['pending']}</div>
             <div class="stat-label">Pending Tasks</div>
         </div>
         ''', unsafe_allow_html=True)
 
         st.markdown(f'''
         <div class="stat-box">
-            <div class="stat-number">{{stats['completed']}}</div>
+            <div class="stat-number">{stats['completed']}</div>
             <div class="stat-label">Completed Total</div>
         </div>
         ''', unsafe_allow_html=True)
@@ -98,7 +98,7 @@ def render_sidebar():
                 r_type = top_recur.get("type", "")
                 if r_type == "daily": recur_str = " | 🔁 Daily"
                 elif r_type == "weekly": recur_str = " | 🔁 Weekly"
-                elif r_type == "interval": recur_str = f" | 🔁 Every {{top_recur.get('days', 2)}} days"
+                elif r_type == "interval": recur_str = f" | 🔁 Every {top_recur.get('days', 2)} days"
 
             if top.deadline:
                 st.caption(f"📅 Due: {top.deadline}{recur_str}")

@@ -19,22 +19,22 @@ def render_analytics():
         k1, k2, k3, k4 = st.columns(4)
         with k1:
             st.markdown(f"""<div class="stat-box">
-                <div class="stat-number">{{data['total']}}</div>
+                <div class="stat-number">{data['total']}</div>
                 <div class="stat-label">Total Tasks</div></div>""",
                 unsafe_allow_html=True)
         with k2:
             st.markdown(f"""<div class="stat-box">
-                <div class="stat-number">{{data['completed']}}</div>
+                <div class="stat-number">{data['completed']}</div>
                 <div class="stat-label">Completed</div></div>""",
                 unsafe_allow_html=True)
         with k3:
             st.markdown(f"""<div class="stat-box">
-                <div class="stat-number">{{data['pending']}}</div>
+                <div class="stat-number">{data['pending']}</div>
                 <div class="stat-label">Pending</div></div>""",
                 unsafe_allow_html=True)
         with k4:
             st.markdown(f"""<div class="stat-box">
-                <div class="stat-number">{{data['completion_rate']}}%</div>
+                <div class="stat-number">{data['completion_rate']}%</div>
                 <div class="stat-label">Completion Rate</div></div>""",
                 unsafe_allow_html=True)
 
@@ -122,8 +122,8 @@ def render_analytics():
             st.markdown(f"""
             <div style="background:{T['bg_card']}; border-radius:12px; padding:20px;
                         text-align:center; border: 2px solid {score_color};">
-                <div style="font-size:2.5rem; font-weight:800; color:{score_color}">{{rate}}%</div>
-                <div style="font-size:1rem; color:{score_color}; margin-top:4px;">{{score_label}}</div>
+                <div style="font-size:2.5rem; font-weight:800; color:{score_color}">{rate}%</div>
+                <div style="font-size:1rem; color:{score_color}; margin-top:4px;">{score_label}</div>
                 <div style="font-size:0.75rem; color:{T['text_muted']}; margin-top:8px;">Completion Rate</div>
             </div>
             """, unsafe_allow_html=True)
@@ -131,9 +131,9 @@ def render_analytics():
         with tip_col:
             st.markdown("#### 💡 Productivity Insights")
             if data["pending"] > 5:
-                st.warning(f"⚠️ You have {{data['pending']}} pending tasks!")
+                st.warning(f"⚠️ You have {data['pending']} pending tasks!")
             if data["priority_counts"].get(1, 0) > 3:
-                st.error(f"🔴 {{data['priority_counts'][1]}} Critical tasks — focus here first!")
+                st.error(f"🔴 {data['priority_counts'][1]} Critical tasks — focus here first!")
             if rate >= 80:
                 st.success("🔥 Outstanding completion rate!")
             elif rate >= 50:
@@ -142,4 +142,4 @@ def render_analytics():
                 st.info("🌱 Just getting started! Complete your top priority task first.")
             top = scheduler.peek_top_task()
             if top:
-                st.markdown(f"**Next recommended task:** {{top.name}} (Priority {{top.priority}})")
+                st.markdown(f"**Next recommended task:** {top.name} (Priority {top.priority})")

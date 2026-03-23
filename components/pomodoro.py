@@ -26,7 +26,7 @@ def render_pomodoro():
     with col_pomo_count:
         st.markdown(f"""
         <div class="stat-box" style="margin:0">
-            <div class="stat-number" style="font-size:1.6rem">{{st.session_state.pomodoro_count}}</div>
+            <div class="stat-number" style="font-size:1.6rem">{st.session_state.pomodoro_count}</div>
             <div class="stat-label">🍅 Done today</div>
         </div>
         """, unsafe_allow_html=True)
